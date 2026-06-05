@@ -34,10 +34,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
 .container { display: flex; height: 100vh; }
 
-/* 左侧设置栏 */
-.settings-panel {
-    width: 15%;
-    min-width: 180px;
+/* 左侧面板（设置 + 地图） */
+.left-panel {
+    width: 25%;
+    min-width: 250px;
     background: #161b22;
     border-right: 1px solid #30363d;
     display: flex;
@@ -51,7 +51,6 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     border-bottom: 1px solid #30363d;
 }
 .settings-body {
-    flex: 1;
     overflow-y: auto;
     padding: 8px 8px;
 }
@@ -154,20 +153,21 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .status-dot.connected { background: #3fb950; }
 #terminal { flex: 1; padding: 4px; }
 
-/* 底部面板 */
+/* 底部输入 */
 .bottom-panel {
-    height: 15vh;
-    min-height: 100px;
     border-top: 1px solid #30363d;
-    display: flex;
-    flex-direction: column;
     flex-shrink: 0;
 }
 .bottom-top { display: flex; flex: 1; min-height: 0; }
 .map-panel {
-    flex: 7;
+    flex: 1;
     background: #0d1117;
-    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.map-panel .xterm {
+    margin: auto 0;
 }
 .map-panel .panel-label {
     background: #161b22;
@@ -176,19 +176,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     color: #6e7681;
     border-bottom: 1px solid #21262d;
 }
-#mapTerminal { height: calc(100% - 22px); }
-.bottom-right {
-    flex: 3;
-    background: #161b22;
-    border-left: 1px solid #30363d;
-    min-width: 120px;
-}
-.bottom-right .panel-label {
-    padding: 2px 10px;
-    font-size: 11px;
-    color: #6e7681;
-    border-bottom: 1px solid #21262d;
-}
+#mapTerminal { flex: 1; min-height: 0; }
 /* 输入框 */
 .input-bar {
     background: #161b22;
@@ -299,7 +287,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 </head>
 <body>
 <div class="container">
-    <div class="settings-panel">
+    <div class="left-panel">
             <div class="settings-header">设置</div>
             <div class="settings-body" id="settingsPanel">
                 <div class="setting-group">
@@ -314,6 +302,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 </div>
             </div>
             <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
+            <div class="map-panel">
+                <div class="panel-label" id="mapLabel">地图</div>
+                <div id="mapTerminal"></div>
+            </div>
     </div>
     <div class="center-area">
         <div class="toolbar">
@@ -327,15 +319,6 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             <div id="terminal"></div>
         </div>
     <div class="bottom-panel">
-        <div class="bottom-top">
-            <div class="map-panel">
-                <div class="panel-label" id="mapLabel">地图</div>
-                <div id="mapTerminal"></div>
-            </div>
-            <div class="bottom-right">
-                <div class="panel-label">预留</div>
-            </div>
-        </div>
         <div class="input-bar">
             <input type="text" id="cmdInput" placeholder="输入命令..." autocomplete="off" autofocus>
             <button class="send-btn" id="sendBtn">发送</button>
@@ -453,8 +436,14 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                     } else if (msg.type === 'history') {
                         renderHistory(msg.data);
                     } else if (msg.type === 'map') {
-                        // 地图数据 → 渲染到地图面板
+                        // 地图数据 → 渲染到地图面板（垂直居中）
                         mapTerm.clear();
+                        var mapLines = msg.data.split('\n').filter(function(l) { return l.trim(); });
+                        var totalRows = mapTerm.rows;
+                        var padding = Math.max(0, Math.floor((totalRows - mapLines.length) / 2));
+                        for (var pi = 0; pi < padding; pi++) {
+                            mapTerm.writeln('');
+                        }
                         mapTerm.write(msg.data);
                         var label = document.getElementById('mapLabel');
                         if (msg.area) {
@@ -1089,6 +1078,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     });
 
     // ─── 地图终端 ───
+    const mapFitAddon = new FitAddon.FitAddon();
     const mapTerm = new Terminal({
         fontSize: 12,
         fontFamily: 'Consolas, "Courier New", monospace',
@@ -1109,9 +1099,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         cursorBlink: false,
         disableStdin: true,
         cols: 80,
-        rows: 6,
+        rows: 20,
     });
     mapTerm.open(document.getElementById('mapTerminal'));
+    mapTerm.loadAddon(mapFitAddon);
+    mapFitAddon.fit();
+    new ResizeObserver(() => mapFitAddon.fit()).observe(document.getElementById('mapTerminal'));
 
     // ─── 退出游戏 ───
     var btnQuit = document.getElementById('btnQuit');
