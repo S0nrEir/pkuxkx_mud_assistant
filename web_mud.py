@@ -407,6 +407,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             setStatus(true);
             term.writeln('\x1b[32m[已连接到 MUD 服务器]\x1b[0m\r\n');
             cmdInput.focus();
+            syncMutedToBackend();
         };
 
         ws.onmessage = function(event) {
