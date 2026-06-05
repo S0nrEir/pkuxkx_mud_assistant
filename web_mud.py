@@ -274,8 +274,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 </head>
 <body>
 <div class="container">
-    <div class="main-area">
-        <div class="settings-panel">
+    <div class="settings-panel">
             <div class="settings-header">设置</div>
             <div class="settings-body" id="settingsPanel">
                 <div class="setting-group">
@@ -290,7 +289,8 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 </div>
             </div>
             <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
-        </div>
+    </div>
+    <div class="center-area">
         <div class="terminal-panel">
             <div class="header">
                 <span class="status-dot" id="statusDot"></span>
@@ -298,21 +298,6 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             </div>
             <div id="terminal"></div>
         </div>
-        <div class="side-panel">
-            <div class="panel-section">
-                <div class="panel-header">命令历史</div>
-                <div class="panel-body" id="cmdHistory">
-                    <div class="empty-hint">暂无命令</div>
-                </div>
-            </div>
-            <div class="panel-section">
-                <div class="panel-header">聊天频道</div>
-                <div class="panel-body" id="chatPanel">
-                    <div class="empty-hint">等待聊天消息...</div>
-                </div>
-            </div>
-        </div>
-    </div>
     <div class="bottom-panel">
         <div class="bottom-top">
             <div class="map-panel">
@@ -326,6 +311,21 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         <div class="input-bar">
             <input type="text" id="cmdInput" placeholder="输入命令..." autocomplete="off" autofocus>
             <button class="send-btn" id="sendBtn">发送</button>
+        </div>
+    </div>
+    </div>
+    <div class="side-panel">
+        <div class="panel-section">
+            <div class="panel-header">命令历史</div>
+            <div class="panel-body" id="cmdHistory">
+                <div class="empty-hint">暂无命令</div>
+            </div>
+        </div>
+        <div class="panel-section">
+            <div class="panel-header">聊天频道</div>
+            <div class="panel-body" id="chatPanel">
+                <div class="empty-hint">等待聊天消息...</div>
+            </div>
         </div>
     </div>
 </div>
