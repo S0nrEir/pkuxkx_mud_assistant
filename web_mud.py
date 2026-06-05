@@ -32,12 +32,15 @@ HTML_PAGE = r"""<!DOCTYPE html>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7; font-family: 'Consolas', 'Courier New', monospace; }
 
-.container { display: flex; height: 100vh; }
+.container { display: flex; flex-direction: column; height: 100vh; }
+
+/* 上方主区域 */
+.main-area { display: flex; flex: 1; min-height: 0; }
 
 /* 左侧设置栏 */
 .settings-panel {
-    width: 170px;
-    min-width: 140px;
+    width: 15%;
+    min-width: 180px;
     background: #161b22;
     border-right: 1px solid #30363d;
     display: flex;
@@ -97,7 +100,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
 /* 中间终端 */
 .terminal-panel {
-    flex: 7;
+    flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -121,11 +124,46 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .status-dot.connected { background: #3fb950; }
 #terminal { flex: 1; padding: 4px; }
 
+/* 底部面板 */
+.bottom-panel {
+    height: 15vh;
+    min-height: 100px;
+    border-top: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.bottom-top { display: flex; flex: 1; min-height: 0; }
+.map-panel {
+    flex: 7;
+    background: #0d1117;
+    min-width: 0;
+}
+.map-panel .panel-label {
+    background: #161b22;
+    padding: 2px 10px;
+    font-size: 11px;
+    color: #6e7681;
+    border-bottom: 1px solid #21262d;
+}
+#mapTerminal { height: calc(100% - 22px); }
+.bottom-right {
+    flex: 3;
+    background: #161b22;
+    border-left: 1px solid #30363d;
+    min-width: 120px;
+}
+.bottom-right .panel-label {
+    padding: 2px 10px;
+    font-size: 11px;
+    color: #6e7681;
+    border-bottom: 1px solid #21262d;
+}
 /* 输入框 */
 .input-bar {
     background: #161b22;
     border-top: 1px solid #30363d;
-    padding: 8px 12px;
+    padding: 6px 12px;
     display: flex;
     gap: 8px;
     flex-shrink: 0;
@@ -135,7 +173,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     background: #0d1117;
     border: 1px solid #30363d;
     border-radius: 4px;
-    padding: 8px 12px;
+    padding: 6px 12px;
     color: #d4dce7;
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 14px;
@@ -151,7 +189,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     color: #fff;
     border: none;
     border-radius: 4px;
-    padding: 8px 16px;
+    padding: 6px 16px;
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
@@ -161,12 +199,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
 /* 右侧面板 */
 .side-panel {
-    flex: 3;
+    width: 18%;
+    min-width: 200px;
     display: flex;
     flex-direction: column;
     border-left: 1px solid #30363d;
-    min-width: 220px;
-    max-width: 360px;
+    flex-shrink: 0;
 }
 .panel-section {
     display: flex;
@@ -231,45 +269,58 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 </head>
 <body>
 <div class="container">
-    <div class="settings-panel">
-        <div class="settings-header">设置</div>
-        <div class="settings-body" id="settingsPanel">
-            <div class="setting-group">
-                <div class="setting-group-title">终端消息屏蔽</div>
-                <div class="setting-row"><input type="checkbox" id="mute_chat" data-ch="chat"><label for="mute_chat">闲聊 <span class="ch-hint">chat</span></label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_rumor" data-ch="rumor"><label for="mute_rumor">谣言 <span class="ch-hint">rumor</span></label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_jy" data-ch="jy"><label for="mute_jy">交易 <span class="ch-hint">jy</span></label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_qq" data-ch="qq"><label for="mute_qq">QQ群 <span class="ch-hint">qq</span></label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_group" data-ch="group"><label for="mute_group">帮派 <span class="ch-hint">group</span></label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_team" data-ch="team"><label for="mute_team">组队</label></div>
-                <div class="setting-row"><input type="checkbox" id="mute_shout" data-ch="shout"><label for="mute_shout">大喊 <span class="ch-hint">shout</span></label></div>
+    <div class="main-area">
+        <div class="settings-panel">
+            <div class="settings-header">设置</div>
+            <div class="settings-body" id="settingsPanel">
+                <div class="setting-group">
+                    <div class="setting-group-title">终端消息屏蔽</div>
+                    <div class="setting-row"><input type="checkbox" id="mute_chat" data-ch="chat"><label for="mute_chat">闲聊 <span class="ch-hint">chat</span></label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_rumor" data-ch="rumor"><label for="mute_rumor">谣言 <span class="ch-hint">rumor</span></label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_jy" data-ch="jy"><label for="mute_jy">交易 <span class="ch-hint">jy</span></label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_qq" data-ch="qq"><label for="mute_qq">QQ群 <span class="ch-hint">qq</span></label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_group" data-ch="group"><label for="mute_group">帮派 <span class="ch-hint">group</span></label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_team" data-ch="team"><label for="mute_team">组队</label></div>
+                    <div class="setting-row"><input type="checkbox" id="mute_shout" data-ch="shout"><label for="mute_shout">大喊 <span class="ch-hint">shout</span></label></div>
+                </div>
+            </div>
+            <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
+        </div>
+        <div class="terminal-panel">
+            <div class="header">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">未连接</span>
+            </div>
+            <div id="terminal"></div>
+        </div>
+        <div class="side-panel">
+            <div class="panel-section">
+                <div class="panel-header">命令历史</div>
+                <div class="panel-body" id="cmdHistory">
+                    <div class="empty-hint">暂无命令</div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <div class="panel-header">聊天频道</div>
+                <div class="panel-body" id="chatPanel">
+                    <div class="empty-hint">等待聊天消息...</div>
+                </div>
             </div>
         </div>
-        <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
     </div>
-    <div class="terminal-panel">
-        <div class="header">
-            <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">未连接</span>
+    <div class="bottom-panel">
+        <div class="bottom-top">
+            <div class="map-panel">
+                <div class="panel-label">地图 (lm)</div>
+                <div id="mapTerminal"></div>
+            </div>
+            <div class="bottom-right">
+                <div class="panel-label">预留</div>
+            </div>
         </div>
-        <div id="terminal"></div>
         <div class="input-bar">
             <input type="text" id="cmdInput" placeholder="输入命令..." autocomplete="off" autofocus>
             <button class="send-btn" id="sendBtn">发送</button>
-        </div>
-    </div>
-    <div class="side-panel">
-        <div class="panel-section">
-            <div class="panel-header">命令历史</div>
-            <div class="panel-body" id="cmdHistory">
-                <div class="empty-hint">暂无命令</div>
-            </div>
-        </div>
-        <div class="panel-section">
-            <div class="panel-header">聊天频道</div>
-            <div class="panel-body" id="chatPanel">
-                <div class="empty-hint">等待聊天消息...</div>
-            </div>
         </div>
     </div>
 </div>
@@ -367,6 +418,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                         addChatMessage(msg.data);
                     } else if (msg.type === 'history') {
                         renderHistory(msg.data);
+                    } else if (msg.type === 'map') {
+                        // 地图数据 → 渲染到地图面板
+                        mapTerm.clear();
+                        mapTerm.write(msg.data);
                     } else if (msg.type === 'mxp_reply') {
                         // 后端通知需要发送 MXP 回复
                         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -995,6 +1050,31 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         cb.addEventListener('change', saveSettings);
     });
 
+    // ─── 地图终端 ───
+    const mapTerm = new Terminal({
+        fontSize: 12,
+        fontFamily: 'Consolas, "Courier New", monospace',
+        theme: {
+            background: '#0d1117',
+            foreground: '#e6e1cf',
+            cursor: 'transparent',
+            cursorAccent: '#0d1117',
+            selectionBackground: '#2a3344',
+            black: '#1a1f29', red: '#f07178', green: '#7fd962', yellow: '#ffb454',
+            blue: '#59c2ff', magenta: '#d2a6ff', cyan: '#95e6cb', white: '#c7c7c7',
+            brightBlack: '#626a75', brightRed: '#ff8e8e', brightGreen: '#a8e6a3',
+            brightYellow: '#ffd68a', brightBlue: '#7dccff', brightMagenta: '#e4bfff',
+            brightCyan: '#b8f0e0', brightWhite: '#ffffff',
+        },
+        scrollback: 500,
+        convertEol: true,
+        cursorBlink: false,
+        disableStdin: true,
+        cols: 80,
+        rows: 6,
+    });
+    mapTerm.open(document.getElementById('mapTerminal'));
+
     // ─── 启动 ───
     loadSettings();
     connect();
@@ -1206,6 +1286,10 @@ class MudSession:
         self.cmd_history = []
         self.log_dir = os.path.join(os.path.dirname(__file__), config.LOG_DIR)
         self._raw_buf = bytearray()   # 原始字节行缓冲
+        self.muted_channels = set()   # 本地屏蔽的频道
+        self._map_capturing = False   # 是否正在捕获地图输出
+        self._map_lines = []          # 捕获到的地图行
+        self._map_done = False        # 地图输出是否已结束
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
 
     async def connect(self):
@@ -1310,6 +1394,26 @@ class MudSession:
                 # 记录日志
                 self._log_data(line_text, 'recv')
 
+                # 地图捕获
+                if self._map_capturing:
+                    if stripped.startswith('>') or (not stripped and self._map_lines):
+                        # 提示符或空行 → 地图结束
+                        if self._map_lines:
+                            map_text = '\n'.join(self._map_lines) + '\n'
+                            msg = json.dumps({
+                                'type': 'map',
+                                'data': map_text,
+                            }, ensure_ascii=False)
+                            try:
+                                await self.ws.send_text(msg)
+                            except Exception:
+                                pass
+                            _rt_log(f'[MAP] 地图捕获完成，{len(self._map_lines)} 行')
+                        self._map_capturing = False
+                        self._map_lines = []
+                    else:
+                        self._map_lines.append(line_text)
+
             # 4. 处理缓冲区中剩余的不完整行（提示符等，无 \n 结尾）
             if self._raw_buf:
                 # 确保不在 GBK 字符中间截断
@@ -1400,6 +1504,14 @@ class MudSession:
                 continue
 
             # 普通文本 → 转码为 GBK 发送到 MUD
+            # 检测 lm / localmaps 命令，开启地图捕获
+            cmd_stripped = text_data.strip().lower()
+            if cmd_stripped in ('lm', 'localmaps'):
+                self._map_capturing = True
+                self._map_lines = []
+                self._map_done = False
+                _rt_log('[MAP] 开始捕获地图输出')
+
             try:
                 data = text_data.encode('gbk')
             except Exception:
@@ -1453,6 +1565,12 @@ class MudSession:
         except Exception:
             pass
 
+        # 运行时日志
+        for line in text.split('\n'):
+            stripped = line.strip()
+            if stripped:
+                _rt_log(f'[{marker}] {stripped[:500]}')
+
 
 # ═══════════════════════════════════════════
 #  Starlette 路由
@@ -1468,9 +1586,11 @@ async def index_page(request):
 
 
 async def websocket_handler(websocket):
+    _rt_log('[WS] 新连接')
     await websocket.accept()
     session = MudSession()
     await session.run(websocket)
+    _rt_log('[WS] 连接结束')
 
 
 routes = [
@@ -1482,8 +1602,41 @@ app = Starlette(routes=routes)
 
 
 # ═══════════════════════════════════════════
-#  启动
+#  运行时日志（每次启动覆盖）
 # ═══════════════════════════════════════════
+
+_runtime_log_path = os.path.join(os.path.dirname(__file__), config.LOG_DIR, 'runtime.log')
+_runtime_log_file = None
+
+
+def _rt_log(msg):
+    """写入运行时日志"""
+    global _runtime_log_file
+    if _runtime_log_file is None:
+        return
+    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    try:
+        _runtime_log_file.write(f'[{timestamp}] {msg}\n')
+        _runtime_log_file.flush()
+    except Exception:
+        pass
+
+
+def _init_runtime_log():
+    """初始化运行时日志文件（覆盖模式）"""
+    global _runtime_log_file
+    os.makedirs(os.path.dirname(_runtime_log_path), exist_ok=True)
+    _runtime_log_file = open(_runtime_log_path, 'w', encoding='utf-8')
+    _rt_log('=== 运行时日志启动 ===')
+
+
+def _close_runtime_log():
+    """关闭运行时日志文件"""
+    global _runtime_log_file
+    if _runtime_log_file:
+        _rt_log('=== 运行时日志结束 ===')
+        _runtime_log_file.close()
+        _runtime_log_file = None
 
 def run_server():
     import uvicorn
@@ -1491,12 +1644,18 @@ def run_server():
     host = '127.0.0.1'
     port = 58080
 
+    _init_runtime_log()
+    _rt_log(f'服务器启动 http://{host}:{port}')
+    _rt_log(f'MUD 服务器: {config.MUD_HOST}:{config.MUD_PORT}')
+    _rt_log(f'运行时日志: {_runtime_log_path}')
+
     print('=' * 50)
     print('  MUD Web 客户端')
     print('=' * 50)
     print()
     print(f'  浏览器访问: http://{host}:{port}')
     print(f'  MUD 服务器: {config.MUD_HOST}:{config.MUD_PORT}')
+    print(f'  运行时日志: {_runtime_log_path}')
     print()
     print('  即将自动打开浏览器...')
     print()
@@ -1509,4 +1668,7 @@ def run_server():
 
     threading.Thread(target=open_browser, daemon=True).start()
 
-    uvicorn.run(app, host=host, port=port, log_level='warning')
+    try:
+        uvicorn.run(app, host=host, port=port, log_level='warning')
+    finally:
+        _close_runtime_log()
