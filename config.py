@@ -2,6 +2,9 @@
 MUD 助手配置文件
 """
 
+import json
+import os
+
 # ===== 服务器配置 =====
 MUD_HOST = "mud.pkuxkx.net"
 MUD_PORT = 5555
@@ -31,3 +34,25 @@ CMD_CATEGORIES = {
     "系统": ["set", "unset", "alias", "unalias", "save", "quit", "recall",
              "brief", "hibernate", "suicide"],
 }
+
+# ===== 区域配置 =====
+# 从 areas.json 加载，构建 房间名 -> (区域代码, 区域名) 反向索引
+AREA_MAP = {}       # code -> {"name": ..., "rooms": [...]}
+ROOM_TO_AREA = {}   # 房间名 -> (code, area_name)
+
+
+def load_areas():
+    """加载区域配置，构建房间名反向索引"""
+    global AREA_MAP, ROOM_TO_AREA
+    path = os.path.join(os.path.dirname(__file__), 'areas.json')
+    if not os.path.exists(path):
+        return
+    with open(path, 'r', encoding='utf-8') as f:
+        AREA_MAP = json.load(f)
+    ROOM_TO_AREA = {}
+    for code, info in AREA_MAP.items():
+        for room in info.get('rooms', []):
+            ROOM_TO_AREA[room] = (code, info['name'])
+
+
+load_areas()

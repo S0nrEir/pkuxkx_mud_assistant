@@ -32,10 +32,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7; font-family: 'Consolas', 'Courier New', monospace; }
 
-.container { display: flex; flex-direction: column; height: 100vh; }
-
-/* 上方主区域 */
-.main-area { display: flex; flex: 1; min-height: 0; }
+.container { display: flex; height: 100vh; }
 
 /* 左侧设置栏 */
 .settings-panel {
@@ -96,6 +93,14 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     font-size: 10px;
     color: #484f58;
     border-top: 1px solid #21262d;
+}
+
+/* 中间区域（终端 + 底部地图/输入） */
+.center-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 /* 中间终端 */
@@ -311,7 +316,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     <div class="bottom-panel">
         <div class="bottom-top">
             <div class="map-panel">
-                <div class="panel-label">地图 (lm)</div>
+                <div class="panel-label" id="mapLabel">地图</div>
                 <div id="mapTerminal"></div>
             </div>
             <div class="bottom-right">
@@ -422,6 +427,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                         // 地图数据 → 渲染到地图面板
                         mapTerm.clear();
                         mapTerm.write(msg.data);
+                        var label = document.getElementById('mapLabel');
+                        if (msg.area) {
+                            label.textContent = '地图 · ' + msg.area.name;
+                        }
                     } else if (msg.type === 'mxp_reply') {
                         // 后端通知需要发送 MXP 回复
                         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1287,9 +1296,8 @@ class MudSession:
         self.log_dir = os.path.join(os.path.dirname(__file__), config.LOG_DIR)
         self._raw_buf = bytearray()   # 原始字节行缓冲
         self.muted_channels = set()   # 本地屏蔽的频道
-        self._map_capturing = False   # 是否正在捕获地图输出
-        self._map_lines = []          # 捕获到的地图行
-        self._map_done = False        # 地图输出是否已结束
+        self._minimap_active = False  # 是否正在收集小地图行
+        self._minimap_lines = []      # 自动捕获的小地图行
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
 
     async def connect(self):
@@ -1330,6 +1338,55 @@ class MudSession:
             except Exception:
                 pass
         print("[会话已关闭]")
+
+    # ─── 小地图检测辅助函数 ───
+    _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
+    _BOX_CHARS = set('─│┌┐└┘├┤┬┴┼━┃╭╮╰╯╠╣╦╩╬═║╳⊕｜\uff5c')
+
+    @classmethod
+    def _clean_line(cls, text):
+        """去除 ANSI 转义码和 MXP 标签，返回纯文本"""
+        return cls._CLEAN_RE.sub('', text).strip()
+
+    @classmethod
+    def _is_minimap_line(cls, text):
+        """判断一行是否是小地图行（包含 box-drawing 连接字符或 ----）"""
+        clean = cls._clean_line(text)
+        if not clean:
+            return False
+        if '----' in clean:
+            return True
+        for ch in clean:
+            if ch in cls._BOX_CHARS:
+                return True
+        return False
+
+    @classmethod
+    def _get_room_name(cls, text):
+        """如果是房间名行，返回房间名；否则返回 None"""
+        clean = cls._clean_line(text)
+        if clean and clean.endswith(' -'):
+            return clean[:-2].strip()
+        return None
+
+    @staticmethod
+    def _leading_spaces(text):
+        """计算行首空格数（跳过 ANSI 转义码）"""
+        n = 0
+        i = 0
+        while i < len(text):
+            if text[i] == '\x1b':
+                # skip ANSI sequence
+                j = text.find('m', i + 1)
+                if j != -1:
+                    i = j + 1
+                    continue
+            if text[i] == ' ':
+                n += 1
+                i += 1
+            else:
+                break
+        return n
 
     # ─── 读取 MUD 服务器 ───
     async def _read_mud_loop(self):
@@ -1394,25 +1451,37 @@ class MudSession:
                 # 记录日志
                 self._log_data(line_text, 'recv')
 
-                # 地图捕获
-                if self._map_capturing:
-                    if stripped.startswith('>') or (not stripped and self._map_lines):
-                        # 提示符或空行 → 地图结束
-                        if self._map_lines:
-                            map_text = '\n'.join(self._map_lines) + '\n'
-                            msg = json.dumps({
-                                'type': 'map',
-                                'data': map_text,
-                            }, ensure_ascii=False)
+                # 自动小地图捕获：检测每行特征
+                if self._is_minimap_line(stripped):
+                    if not self._minimap_active:
+                        self._minimap_active = True
+                        self._minimap_lines = []
+                    self._minimap_lines.append(line_text)
+                elif self._minimap_active:
+                    room_name = self._get_room_name(stripped)
+                    if room_name is not None:
+                        self._minimap_lines.append(line_text)
+                        if self._minimap_lines:
+                            map_text = '\n'.join(self._minimap_lines) + '\n'
+                            map_msg = {'type': 'map', 'data': map_text}
+                            area_info = config.ROOM_TO_AREA.get(room_name)
+                            if area_info:
+                                map_msg['area'] = {'code': area_info[0], 'name': area_info[1]}
+                            msg = json.dumps(map_msg, ensure_ascii=False)
                             try:
                                 await self.ws.send_text(msg)
                             except Exception:
                                 pass
-                            _rt_log(f'[MAP] 地图捕获完成，{len(self._map_lines)} 行')
-                        self._map_capturing = False
-                        self._map_lines = []
+                            _rt_log(f'[MAP] 自动小地图，{len(self._minimap_lines)} 行'
+                                    f'{f" · {area_info[1]}" if area_info else ""}')
+                        self._minimap_active = False
+                        self._minimap_lines = []
+                    elif self._leading_spaces(line_text) >= 10:
+                        # 高缩进的纯文本行也是地图内容（相邻房间名等）
+                        self._minimap_lines.append(line_text)
                     else:
-                        self._map_lines.append(line_text)
+                        self._minimap_active = False
+                        self._minimap_lines = []
 
             # 4. 处理缓冲区中剩余的不完整行（提示符等，无 \n 结尾）
             if self._raw_buf:
@@ -1504,14 +1573,6 @@ class MudSession:
                 continue
 
             # 普通文本 → 转码为 GBK 发送到 MUD
-            # 检测 lm / localmaps 命令，开启地图捕获
-            cmd_stripped = text_data.strip().lower()
-            if cmd_stripped in ('lm', 'localmaps'):
-                self._map_capturing = True
-                self._map_lines = []
-                self._map_done = False
-                _rt_log('[MAP] 开始捕获地图输出')
-
             try:
                 data = text_data.encode('gbk')
             except Exception:
