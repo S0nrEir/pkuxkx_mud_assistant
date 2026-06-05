@@ -103,6 +103,31 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     min-width: 0;
 }
 
+/* 顶部工具栏 */
+.toolbar {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.toolbar-btn {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+.toolbar-btn:hover { background: #30363d; }
+.toolbar-btn.danger { color: #f85149; border-color: #da3633; }
+.toolbar-btn.danger:hover { background: #da3633; color: #fff; }
+
 /* 中间终端 */
 .terminal-panel {
     flex: 1;
@@ -291,6 +316,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
     </div>
     <div class="center-area">
+        <div class="toolbar">
+            <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
+        </div>
         <div class="terminal-panel">
             <div class="header">
                 <span class="status-dot" id="statusDot"></span>
@@ -1085,6 +1113,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     });
     mapTerm.open(document.getElementById('mapTerminal'));
 
+    // ─── 退出游戏 ───
+    var btnQuit = document.getElementById('btnQuit');
+    btnQuit.addEventListener('click', function() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (btnQuit.dataset.quitting) return;
+        btnQuit.dataset.quitting = '1';
+        btnQuit.textContent = '保存中...';
+        btnQuit.disabled = true;
+        term.writeln('\x1b[33m[正在保存并退出游戏...]\x1b[0m\r\n');
+        ws.send(JSON.stringify({ type: 'quit_game' }));
+    });
+
     // ─── 启动 ───
     loadSettings();
     connect();
@@ -1299,6 +1339,7 @@ class MudSession:
         self.muted_channels = set()   # 本地屏蔽的频道
         self._minimap_active = False  # 是否正在收集小地图行
         self._minimap_lines = []      # 自动捕获的小地图行
+        self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
 
     async def connect(self):
@@ -1452,6 +1493,13 @@ class MudSession:
                 # 记录日志
                 self._log_data(line_text, 'recv')
 
+                # save 回复检测：收到提示符说明 save 完成，发送 quit
+                if self._quit_pending and stripped.startswith('>'):
+                    self._quit_pending = False
+                    self.writer.write(b'quit\r\n')
+                    await self.writer.drain()
+                    self._log_data('quit', 'send')
+
                 # 自动小地图捕获：检测每行特征
                 if self._is_minimap_line(stripped):
                     if not self._minimap_active:
@@ -1569,6 +1617,11 @@ class MudSession:
                             await self.writer.drain()
                     elif j.get('type') == 'mute_channels':
                         self.muted_channels = set(j.get('data', []))
+                    elif j.get('type') == 'quit_game':
+                        self._quit_pending = True
+                        self.writer.write(b'save\r\n')
+                        await self.writer.drain()
+                        self._log_data('save', 'send')
                 except (json.JSONDecodeError, KeyError):
                     pass
                 continue
