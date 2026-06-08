@@ -151,7 +151,26 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     display: inline-block;
 }
 .status-dot.connected { background: #3fb950; }
-#terminal { flex: 1; padding: 4px; }
+#terminal { flex: 1; padding: 4px; position: relative; }
+.scroll-bottom-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #3d444d;
+    border-radius: 4px;
+    background: rgba(22, 27, 34, 0.92);
+    color: #c9d1d9;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 10;
+}
+.scroll-bottom-btn:hover {
+    background: #30363d;
+    color: #ffffff;
+}
 
 /* 底部输入 */
 .bottom-panel {
@@ -316,7 +335,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 <span class="status-dot" id="statusDot"></span>
                 <span id="statusText">未连接</span>
             </div>
-            <div id="terminal"></div>
+            <div id="terminal">
+                <button class="scroll-bottom-btn" id="scrollBottomBtn" title="回到底部">⌄</button>
+            </div>
         </div>
     <div class="bottom-panel">
         <div class="input-bar">
@@ -402,6 +423,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const statusText = document.getElementById('statusText');
     const cmdInput = document.getElementById('cmdInput');
     const sendBtn = document.getElementById('sendBtn');
+    const scrollBottomBtn = document.getElementById('scrollBottomBtn');
     let chatInitialized = false;
 
     function setStatus(connected) {
@@ -500,6 +522,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     }
 
     sendBtn.addEventListener('click', sendCommand);
+
+    scrollBottomBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        term.scrollToBottom();
+        cmdInput.focus();
+    });
 
     cmdInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
