@@ -103,6 +103,104 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .toolbar-btn:hover { background: #30363d; }
 .toolbar-btn.danger { color: #f85149; border-color: #da3633; }
 .toolbar-btn.danger:hover { background: #da3633; color: #fff; }
+.trigger-panel {
+    position: absolute;
+    top: 36px;
+    left: 25%;
+    width: 50vw;
+    height: 50vh;
+    min-width: 620px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    box-shadow: 0 16px 42px rgba(0,0,0,0.5);
+    z-index: 30;
+    display: none;
+    grid-template-columns: 42% 58%;
+}
+.trigger-panel.open { display: grid; }
+.trigger-browser {
+    border-right: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.trigger-list { flex: 1; overflow-y: auto; }
+.trigger-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #21262d;
+    cursor: pointer;
+    font-size: 12px;
+}
+.trigger-item:hover,
+.trigger-item.active { background: #1f2937; color: #79c0ff; }
+.trigger-item-title { font-weight: 700; margin-bottom: 3px; }
+.trigger-item-meta { color: #8b949e; font-size: 11px; }
+.trigger-detail {
+    border-top: 1px solid #30363d;
+    padding: 8px 10px;
+    min-height: 108px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    color: #c9d1d9;
+}
+.trigger-actions {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid #30363d;
+}
+.trigger-editor { padding: 10px 12px; overflow-y: auto; }
+.trigger-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+}
+.trigger-field label { color: #8b949e; font-size: 11px; }
+.trigger-field input,
+.trigger-field textarea {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #d4dce7;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    padding: 5px 6px;
+    outline: none;
+}
+.trigger-field textarea { min-height: 52px; resize: vertical; }
+.trigger-rule-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 28px;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.trigger-rule-row input { min-width: 0; }
+.trigger-small-btn {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.trigger-small-btn:hover { background: #30363d; }
+.trigger-small-btn.primary { background: #238636; border-color: #2ea043; color: #fff; }
+.trigger-small-btn.danger { color: #f85149; border-color: #da3633; }
+.trigger-status {
+    min-height: 16px;
+    color: #8b949e;
+    font-size: 11px;
+    margin-top: 6px;
+}
+.trigger-status.error { color: #f85149; }
+.trigger-status.ok { color: #7ee787; }
 
 /* 中间终端 */
 .terminal-panel {
@@ -305,7 +403,40 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     </div>
     <div class="center-area">
         <div class="toolbar">
+            <button class="toolbar-btn" id="btnTriggers">触发器</button>
             <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
+            <div class="trigger-panel" id="triggerPanel">
+                <div class="trigger-browser">
+                    <div class="trigger-list" id="triggerList">
+                        <div class="empty-hint">暂无触发器</div>
+                    </div>
+                    <div class="trigger-detail" id="triggerDetail">选择一个触发器查看详情</div>
+                    <div class="trigger-actions">
+                        <button class="trigger-small-btn primary" id="triggerLoadBtn" disabled>加载</button>
+                        <button class="trigger-small-btn danger" id="triggerDeleteBtn" disabled>删除</button>
+                    </div>
+                </div>
+                <div class="trigger-editor">
+                    <div class="trigger-field">
+                        <label for="triggerName">触发器名称</label>
+                        <input type="text" id="triggerName" placeholder="例如：读书恢复">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="triggerNotes">备注</label>
+                        <textarea id="triggerNotes" placeholder="可写用途、地点或注意事项"></textarea>
+                    </div>
+                    <div class="trigger-field">
+                        <label>分支规则：服务器消息关键词 → 发送指令</label>
+                        <div id="triggerRules"></div>
+                    </div>
+                    <div class="trigger-actions">
+                        <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
+                        <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
+                        <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
+                    </div>
+                    <div class="trigger-status" id="triggerStatus">未加载触发器</div>
+                </div>
+            </div>
         </div>
         <div class="terminal-panel">
             <div class="header">
@@ -401,6 +532,21 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const cmdInput = document.getElementById('cmdInput');
     const sendBtn = document.getElementById('sendBtn');
     const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+    const btnTriggers = document.getElementById('btnTriggers');
+    const triggerPanel = document.getElementById('triggerPanel');
+    const triggerListEl = document.getElementById('triggerList');
+    const triggerDetailEl = document.getElementById('triggerDetail');
+    const triggerLoadBtn = document.getElementById('triggerLoadBtn');
+    const triggerDeleteBtn = document.getElementById('triggerDeleteBtn');
+    const triggerNameEl = document.getElementById('triggerName');
+    const triggerNotesEl = document.getElementById('triggerNotes');
+    const triggerRulesEl = document.getElementById('triggerRules');
+    const triggerAddRuleBtn = document.getElementById('triggerAddRuleBtn');
+    const triggerSaveBtn = document.getElementById('triggerSaveBtn');
+    const triggerStopBtn = document.getElementById('triggerStopBtn');
+    const triggerStatusEl = document.getElementById('triggerStatus');
+    let triggerItems = [];
+    let selectedTriggerId = '';
     let chatInitialized = false;
 
     function setStatus(connected) {
@@ -437,6 +583,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             term.writeln('\x1b[32m[已连接到 MUD 服务器]\x1b[0m\r\n');
             cmdInput.focus();
             syncMutedToBackend();
+            sendTriggerMessage('list');
         };
 
         ws.onmessage = function(event) {
@@ -453,6 +600,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                         addChatMessage(msg.data);
                     } else if (msg.type === 'history') {
                         renderHistory(msg.data);
+                    } else if (msg.type === 'trigger_list') {
+                        handleTriggerList(msg);
+                    } else if (msg.type === 'trigger_status') {
+                        handleTriggerStatus(msg);
+                    } else if (msg.type === 'trigger_event') {
+                        handleTriggerEvent(msg);
                     } else if (msg.type === 'map') {
                         // 地图数据 → 渲染到地图面板（垂直居中）
                         mapTerm.clear();
@@ -1095,6 +1248,170 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     muteCheckboxes.forEach(function(cb) {
         cb.addEventListener('change', saveSettings);
     });
+
+    // ─── 触发器 ───
+    function setTriggerStatus(text, kind) {
+        triggerStatusEl.textContent = text || '';
+        triggerStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
+    }
+
+    function sendTriggerMessage(action, data) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            setTriggerStatus('未连接，无法操作', 'error');
+            return;
+        }
+        ws.send(JSON.stringify(Object.assign({ type: 'trigger', action: action }, data || {})));
+    }
+
+    function addTriggerRule(keyword, command) {
+        const row = document.createElement('div');
+        row.className = 'trigger-rule-row';
+        row.innerHTML =
+            '<input type="text" class="trigger-keyword" placeholder="消息关键词" value="' + escapeAttr(keyword || '') + '">' +
+            '<input type="text" class="trigger-command" placeholder="发送指令" value="' + escapeAttr(command || '') + '">' +
+            '<button class="trigger-small-btn danger" type="button">×</button>';
+        row.querySelector('button').addEventListener('click', function() {
+            row.remove();
+        });
+        triggerRulesEl.appendChild(row);
+    }
+
+    function clearTriggerForm() {
+        triggerNameEl.value = '';
+        triggerNotesEl.value = '';
+        triggerRulesEl.innerHTML = '';
+        addTriggerRule('', '');
+    }
+
+    function fillTriggerForm(config) {
+        config = config || {};
+        triggerNameEl.value = config.name || '';
+        triggerNotesEl.value = config.notes || '';
+        triggerRulesEl.innerHTML = '';
+        const rules = config.rules || [];
+        if (!rules.length) addTriggerRule('', '');
+        rules.forEach(function(rule) {
+            addTriggerRule(rule.keyword, rule.command);
+        });
+    }
+
+    function getTriggerFormConfig() {
+        const rules = [];
+        triggerRulesEl.querySelectorAll('.trigger-rule-row').forEach(function(row) {
+            const keyword = row.querySelector('.trigger-keyword').value.trim();
+            const command = row.querySelector('.trigger-command').value.trim();
+            if (keyword && command) rules.push({ keyword: keyword, command: command });
+        });
+        return {
+            name: triggerNameEl.value.trim(),
+            notes: triggerNotesEl.value,
+            rules: rules,
+        };
+    }
+
+    function formatTriggerDetail(config) {
+        if (!config) return '选择一个触发器查看详情';
+        const lines = [
+            '名称: ' + (config.name || ''),
+            '分支数: ' + ((config.rules || []).length),
+            '',
+            '规则:',
+        ];
+        (config.rules || []).forEach(function(rule, index) {
+            lines.push((index + 1) + '. ' + rule.keyword + ' -> ' + rule.command);
+        });
+        if (config.notes) {
+            lines.push('', '备注:', config.notes);
+        }
+        return lines.join('\n');
+    }
+
+    function renderTriggerList(items) {
+        triggerItems = items || [];
+        if (!triggerItems.length) {
+            triggerListEl.innerHTML = '<div class="empty-hint">暂无触发器</div>';
+            triggerDetailEl.textContent = '选择一个触发器查看详情';
+            triggerLoadBtn.disabled = true;
+            triggerDeleteBtn.disabled = true;
+            selectedTriggerId = '';
+            return;
+        }
+        triggerListEl.innerHTML = triggerItems.map(function(item) {
+            const active = item.id === selectedTriggerId ? ' active' : '';
+            return '<div class="trigger-item' + active + '" data-id="' + escapeAttr(item.id) + '">' +
+                '<div class="trigger-item-title">' + escapeHtml(item.name || item.id) + '</div>' +
+                '<div class="trigger-item-meta">' + item.rules_count + ' 个分支</div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function selectTrigger(id) {
+        selectedTriggerId = id || '';
+        const item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
+        triggerDetailEl.textContent = formatTriggerDetail(item && item.config);
+        triggerLoadBtn.disabled = !item;
+        triggerDeleteBtn.disabled = !item;
+        renderTriggerList(triggerItems);
+    }
+
+    function handleTriggerList(msg) {
+        renderTriggerList(msg.items || []);
+        if (msg.active_id) selectedTriggerId = msg.active_id;
+        if (selectedTriggerId) selectTrigger(selectedTriggerId);
+        if (msg.status) setTriggerStatus(msg.status, 'ok');
+    }
+
+    function handleTriggerStatus(msg) {
+        if (msg.config) fillTriggerForm(msg.config);
+        if (msg.id) selectedTriggerId = msg.id;
+        if (msg.status) setTriggerStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+    }
+
+    function handleTriggerEvent(msg) {
+        if (msg.command) showSentCommand(msg.command);
+    }
+
+    btnTriggers.addEventListener('click', function(e) {
+        e.stopPropagation();
+        triggerPanel.classList.toggle('open');
+        if (triggerPanel.classList.contains('open')) sendTriggerMessage('list');
+    });
+
+    triggerListEl.addEventListener('click', function(e) {
+        const item = e.target.closest('.trigger-item');
+        if (!item) return;
+        selectTrigger(item.getAttribute('data-id'));
+    });
+
+    triggerLoadBtn.addEventListener('click', function() {
+        if (!selectedTriggerId) return;
+        sendTriggerMessage('load', { id: selectedTriggerId });
+    });
+
+    triggerDeleteBtn.addEventListener('click', function() {
+        if (!selectedTriggerId) return;
+        sendTriggerMessage('delete', { id: selectedTriggerId });
+    });
+
+    triggerAddRuleBtn.addEventListener('click', function() {
+        addTriggerRule('', '');
+    });
+
+    triggerSaveBtn.addEventListener('click', function() {
+        sendTriggerMessage('save', { config: getTriggerFormConfig() });
+    });
+
+    triggerStopBtn.addEventListener('click', function() {
+        sendTriggerMessage('stop');
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!triggerPanel.contains(e.target) && e.target !== btnTriggers) {
+            triggerPanel.classList.remove('open');
+        }
+    });
+
+    clearTriggerForm();
 
     // ─── 地图终端 ───
     const mapFitAddon = new FitAddon.FitAddon();

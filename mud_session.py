@@ -9,6 +9,7 @@ from datetime import datetime
 import config
 from chat_monitor import is_chat_message
 from mud_telnet import gbk_safe_split, strip_iac_and_respond
+from triggers import TriggerRuntime, delete_config, list_configs, load_config, save_config
 
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07')
 
@@ -56,6 +57,7 @@ class MudSession:
         self._minimap_lines = []      # 自动捕获的小地图行
         self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
+        self.triggers = TriggerRuntime()
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -95,6 +97,98 @@ class MudSession:
             except Exception:
                 pass
         print("[会话已关闭]")
+
+    async def _send_ws_json(self, payload):
+        try:
+            await self.ws.send_text(json.dumps(payload, ensure_ascii=False))
+        except Exception:
+            pass
+
+    async def _send_mud_command(self, command):
+        command = str(command or '').strip()
+        if not command or not self.writer:
+            return
+        self.writer.write((command + '\r\n').encode('gbk', errors='replace'))
+        await self.writer.drain()
+        self._log_data(command, 'send')
+        await self._send_ws_json({
+            'type': 'trigger_event',
+            'command': command,
+            'active': self.triggers.active,
+        })
+
+    async def _send_trigger_list(self, status=''):
+        payload = {
+            'type': 'trigger_list',
+            'items': list_configs(),
+            'active_id': self.triggers.active_id,
+            'active': self.triggers.active,
+        }
+        if status:
+            payload['status'] = status
+        await self._send_ws_json(payload)
+
+    async def _handle_trigger_ws(self, msg):
+        action = msg.get('action')
+        if action == 'list':
+            await self._send_trigger_list()
+            return
+
+        if action == 'save':
+            try:
+                trigger_id, config_data = save_config(msg.get('config') or {})
+            except ValueError as e:
+                await self._send_ws_json({'type': 'trigger_status', 'ok': False, 'status': f'保存失败：{e}'})
+                return
+            await self._send_ws_json({
+                'type': 'trigger_status',
+                'ok': True,
+                'status': '已保存触发器',
+                'id': trigger_id,
+                'config': config_data,
+            })
+            await self._send_trigger_list()
+            return
+
+        if action == 'load':
+            try:
+                trigger_id = msg.get('id') or ''
+                config_data = self.triggers.load(trigger_id, load_config(trigger_id))
+            except Exception as e:
+                await self._send_ws_json({'type': 'trigger_status', 'ok': False, 'status': f'加载失败：{e}'})
+                return
+            await self._send_ws_json({
+                'type': 'trigger_status',
+                'ok': True,
+                'status': '已加载触发器',
+                'id': self.triggers.active_id,
+                'config': config_data,
+                'active': True,
+            })
+            await self._send_trigger_list()
+            return
+
+        if action == 'delete':
+            trigger_id = msg.get('id') or ''
+            if self.triggers.active_id == trigger_id:
+                self.triggers.stop()
+            delete_config(trigger_id)
+            await self._send_trigger_list('已删除触发器')
+            return
+
+        if action == 'stop':
+            self.triggers.stop()
+            await self._send_ws_json({
+                'type': 'trigger_status',
+                'ok': True,
+                'status': '已停止触发器',
+                'active': False,
+            })
+            await self._send_trigger_list()
+
+    async def _handle_trigger_text(self, text):
+        for rule in self.triggers.match(text):
+            await self._send_mud_command(rule['command'])
 
     # ─── 小地图检测辅助函数 ───
     _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
@@ -207,6 +301,7 @@ class MudSession:
 
                 # 记录日志
                 self._log_data(line_text, 'recv')
+                await self._handle_trigger_text(line_text)
 
                 # save 回复检测：收到提示符说明 save 完成，发送 quit
                 if self._quit_pending and stripped.startswith('>'):
@@ -265,6 +360,7 @@ class MudSession:
                         return
 
                     self._log_data(text, 'recv')
+                    await self._handle_trigger_text(text)
 
                     # 检测编码选择提示
                     if 'Input 1 for GBK' in text:
@@ -332,6 +428,8 @@ class MudSession:
                             await self.writer.drain()
                     elif j.get('type') == 'mute_channels':
                         self.muted_channels = set(j.get('data', []))
+                    elif j.get('type') == 'trigger':
+                        await self._handle_trigger_ws(j)
                     elif j.get('type') == 'quit_game':
                         self._quit_pending = True
                         self.writer.write(b'save\r\n')
