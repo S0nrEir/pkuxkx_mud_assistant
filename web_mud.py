@@ -376,6 +376,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         scrollback: 5000,
         convertEol: true,
         cursorBlink: true,
+        lineHeight: 1.12,
         cols: 80,
         rows: 24,
     });
@@ -409,6 +410,24 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     }
 
     // ─── WebSocket ───
+    function sanitizeTerminalText(text) {
+        return String(text).replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+    }
+
+    function showSentCommand(cmd) {
+        const visibleCmd = sanitizeTerminalText(cmd).trim();
+        if (!visibleCmd) return;
+        term.writeln('\r\n\x1b[48;5;236m\x1b[38;5;220m\x1b[1m[CMD]\x1b[0m \x1b[38;5;220m' + visibleCmd + '\x1b[0m\r\n');
+    }
+
+    function sendMudCommand(cmd) {
+        if (!cmd.trim() || !ws || ws.readyState !== WebSocket.OPEN) return false;
+        showSentCommand(cmd);
+        ws.send(cmd + '\r');
+        ws.send(JSON.stringify({ type: 'command', data: cmd.trim() }));
+        return true;
+    }
+
     function connect() {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(proto + '//' + location.host + '/ws');
@@ -471,12 +490,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     // ─── 输入框发送命令 ───
     function sendCommand() {
         const cmd = cmdInput.value;
-        if (!cmd.trim() || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-        // 发送到服务器
-        ws.send(cmd + '\r');
-        // 通知后端记录命令历史
-        ws.send(JSON.stringify({ type: 'command', data: cmd.trim() }));
+        if (!sendMudCommand(cmd)) return;
 
         // 本地输入历史
         inputHistory.push(cmd);
@@ -568,7 +582,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                             text: link.text,
                             activate: function() {
                                 if (ws && ws.readyState === WebSocket.OPEN) {
-                                    ws.send(link.command + '\r');
+                                    sendMudCommand(link.command);
                                 }
                             }
                         });
