@@ -133,6 +133,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .trigger-item:hover,
 .trigger-item.active { background: #1f2937; color: #79c0ff; }
+.trigger-item.loaded { background: #1a2f1e; border-left: 3px solid #3fb950; }
+.trigger-item.loaded.active { background: #1a3424; }
+.trigger-loaded-badge { color: #3fb950; font-size: 10px; font-weight: 400; margin-left: 6px; }
 .trigger-item-title { font-weight: 700; margin-bottom: 3px; }
 .trigger-item-meta { color: #8b949e; font-size: 11px; }
 .trigger-detail {
@@ -430,6 +433,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                         <div id="triggerRules"></div>
                     </div>
                     <div class="trigger-actions">
+                        <button class="trigger-small-btn" id="triggerNewBtn">新建</button>
                         <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
                         <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
                         <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
@@ -541,12 +545,14 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const triggerNameEl = document.getElementById('triggerName');
     const triggerNotesEl = document.getElementById('triggerNotes');
     const triggerRulesEl = document.getElementById('triggerRules');
+    const triggerNewBtn = document.getElementById('triggerNewBtn');
     const triggerAddRuleBtn = document.getElementById('triggerAddRuleBtn');
     const triggerSaveBtn = document.getElementById('triggerSaveBtn');
     const triggerStopBtn = document.getElementById('triggerStopBtn');
     const triggerStatusEl = document.getElementById('triggerStatus');
     let triggerItems = [];
     let selectedTriggerId = '';
+    let activeTriggerId = '';
     let chatInitialized = false;
 
     function setStatus(connected) {
@@ -1283,6 +1289,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         addTriggerRule('', '');
     }
 
+    function startNewTrigger() {
+        selectedTriggerId = '';
+        clearTriggerForm();
+        triggerDetailEl.textContent = '正在新建触发器';
+        triggerLoadBtn.disabled = true;
+        triggerDeleteBtn.disabled = true;
+        triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        setTriggerStatus('正在新建触发器', 'ok');
+    }
+
     function fillTriggerForm(config) {
         config = config || {};
         triggerNameEl.value = config.name || '';
@@ -1337,34 +1355,62 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             return;
         }
         triggerListEl.innerHTML = triggerItems.map(function(item) {
-            const active = item.id === selectedTriggerId ? ' active' : '';
-            return '<div class="trigger-item' + active + '" data-id="' + escapeAttr(item.id) + '">' +
-                '<div class="trigger-item-title">' + escapeHtml(item.name || item.id) + '</div>' +
+            var cls = '';
+            if (item.id === activeTriggerId) cls += ' loaded';
+            if (item.id === selectedTriggerId) cls += ' active';
+            var badge = item.id === activeTriggerId ? '<span class="trigger-loaded-badge">已加载</span>' : '';
+            return '<div class="trigger-item' + cls + '" data-id="' + escapeAttr(item.id) + '">' +
+                '<div class="trigger-item-title"><span class="trigger-item-name">' + escapeHtml(item.name || item.id) + '</span>' + badge + '</div>' +
                 '<div class="trigger-item-meta">' + item.rules_count + ' 个分支</div>' +
                 '</div>';
         }).join('');
+        triggerLoadBtn.disabled = !selectedTriggerId || (selectedTriggerId === activeTriggerId);
     }
 
     function selectTrigger(id) {
         selectedTriggerId = id || '';
-        const item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
+        var item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
         triggerDetailEl.textContent = formatTriggerDetail(item && item.config);
-        triggerLoadBtn.disabled = !item;
+        if (item && item.config) fillTriggerForm(item.config);
         triggerDeleteBtn.disabled = !item;
-        renderTriggerList(triggerItems);
+        triggerLoadBtn.disabled = !item || (selectedTriggerId === activeTriggerId);
+        triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            var elId = el.getAttribute('data-id');
+            el.classList.toggle('active', elId === selectedTriggerId);
+            var title = el.querySelector('.trigger-item-title');
+            if (title) {
+                var badge = title.querySelector('.trigger-loaded-badge');
+                if (elId === activeTriggerId) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'trigger-loaded-badge';
+                        badge.textContent = '已加载';
+                        title.appendChild(badge);
+                    }
+                } else {
+                    if (badge) badge.remove();
+                }
+            }
+        });
     }
 
     function handleTriggerList(msg) {
+        activeTriggerId = msg.active_id || '';
         renderTriggerList(msg.items || []);
-        if (msg.active_id) selectedTriggerId = msg.active_id;
+        if (activeTriggerId && !selectedTriggerId) selectedTriggerId = activeTriggerId;
         if (selectedTriggerId) selectTrigger(selectedTriggerId);
         if (msg.status) setTriggerStatus(msg.status, 'ok');
     }
 
     function handleTriggerStatus(msg) {
         if (msg.config) fillTriggerForm(msg.config);
+        if (msg.id && msg.active) activeTriggerId = msg.id;
+        if (msg.active === false) activeTriggerId = '';
         if (msg.id) selectedTriggerId = msg.id;
         if (msg.status) setTriggerStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+        renderTriggerList(triggerItems);
+        if (activeTriggerId && !selectedTriggerId) selectedTriggerId = activeTriggerId;
+        if (selectedTriggerId) selectTrigger(selectedTriggerId);
     }
 
     function handleTriggerEvent(msg) {
@@ -1378,8 +1424,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     });
 
     triggerListEl.addEventListener('click', function(e) {
-        const item = e.target.closest('.trigger-item');
+        var item = e.target.closest('.trigger-item');
         if (!item) return;
+        e.stopPropagation();
         selectTrigger(item.getAttribute('data-id'));
     });
 
@@ -1397,8 +1444,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         addTriggerRule('', '');
     });
 
+    triggerNewBtn.addEventListener('click', function() {
+        startNewTrigger();
+    });
+
     triggerSaveBtn.addEventListener('click', function() {
-        sendTriggerMessage('save', { config: getTriggerFormConfig() });
+        sendTriggerMessage('save', { id: selectedTriggerId, config: getTriggerFormConfig() });
     });
 
     triggerStopBtn.addEventListener('click', function() {

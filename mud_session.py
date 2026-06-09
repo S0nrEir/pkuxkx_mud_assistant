@@ -58,6 +58,7 @@ class MudSession:
         self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
+        self._trigger_lock = asyncio.Lock()
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -117,6 +118,25 @@ class MudSession:
             'active': self.triggers.active,
         })
 
+    @staticmethod
+    def _split_trigger_commands(command):
+        commands = []
+        for part in re.split(r'[;\n]+', str(command or '')):
+            part = part.strip()
+            if part:
+                commands.append(part)
+        return commands
+
+    async def _run_trigger_rule(self, rule):
+        commands = self._split_trigger_commands(rule.get('command'))
+        if not commands:
+            return
+        async with self._trigger_lock:
+            for command in commands:
+                await self._send_mud_command(command)
+                if len(commands) > 1:
+                    await asyncio.sleep(0.35)
+
     async def _send_trigger_list(self, status=''):
         payload = {
             'type': 'trigger_list',
@@ -136,17 +156,24 @@ class MudSession:
 
         if action == 'save':
             try:
-                trigger_id, config_data = save_config(msg.get('config') or {})
+                original_id = msg.get('id') or ''
+                was_active = bool(original_id and self.triggers.active_id == original_id)
+                trigger_id, config_data = save_config(msg.get('config') or {}, original_id)
+                if was_active or self.triggers.active_id == trigger_id:
+                    self.triggers.load(trigger_id, config_data)
             except ValueError as e:
                 await self._send_ws_json({'type': 'trigger_status', 'ok': False, 'status': f'保存失败：{e}'})
                 return
-            await self._send_ws_json({
+            payload = {
                 'type': 'trigger_status',
                 'ok': True,
                 'status': '已保存触发器',
                 'id': trigger_id,
                 'config': config_data,
-            })
+            }
+            if self.triggers.active_id == trigger_id:
+                payload['active'] = True
+            await self._send_ws_json(payload)
             await self._send_trigger_list()
             return
 
@@ -188,7 +215,7 @@ class MudSession:
 
     async def _handle_trigger_text(self, text):
         for rule in self.triggers.match(text):
-            await self._send_mud_command(rule['command'])
+            asyncio.create_task(self._run_trigger_rule(rule))
 
     # ─── 小地图检测辅助函数 ───
     _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')

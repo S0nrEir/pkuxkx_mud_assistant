@@ -45,13 +45,18 @@ def validate_config(config):
     return config
 
 
-def save_config(config):
+def save_config(config, trigger_id=None):
     config = validate_config(config)
     os.makedirs(TRIGGER_DIR, exist_ok=True)
-    trigger_id = _safe_id(config['name'])
-    with open(_path(trigger_id), 'w', encoding='utf-8') as f:
+    old_id = _safe_id(trigger_id) if trigger_id else ''
+    new_id = _safe_id(config['name'])
+    with open(_path(new_id), 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
-    return trigger_id, config
+    if old_id and old_id != new_id:
+        old_path = _path(old_id)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    return new_id, config
 
 
 def load_config(trigger_id):
