@@ -29,6 +29,10 @@
     {
       "keyword": "你刚刚睡过一觉, 多睡对身体有害无益!",
       "command": "sleep"
+    },
+    {
+      "keyword": "你吐纳完毕，睁开双眼，站了起来。",
+      "command": "du luo shu for 5"
     }
   ]
 }

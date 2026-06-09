@@ -27,8 +27,13 @@ def normalize_config(config):
             continue
         keyword = str(rule.get('keyword') or '').strip()
         command = str(rule.get('command') or '').strip()
+        try:
+            delay = float(rule.get('delay') or 0)
+        except (TypeError, ValueError):
+            delay = 0
+        delay = max(0, min(delay, 3600))
         if keyword and command:
-            clean_rules.append({'keyword': keyword, 'command': command})
+            clean_rules.append({'keyword': keyword, 'command': command, 'delay': delay})
     return {
         'name': str(config.get('name') or '').strip(),
         'notes': str(config.get('notes') or ''),
@@ -40,8 +45,6 @@ def validate_config(config):
     config = normalize_config(config)
     if not config['name']:
         raise ValueError('必须填写触发器名称')
-    if not config['rules']:
-        raise ValueError('至少需要一条关键词和指令')
     return config
 
 

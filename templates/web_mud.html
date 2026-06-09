@@ -178,7 +178,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .trigger-field textarea { min-height: 52px; resize: vertical; }
 .trigger-rule-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 28px;
+    grid-template-columns: 1fr 1fr 72px 28px;
     gap: 6px;
     margin-bottom: 6px;
 }
@@ -1269,16 +1269,14 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         ws.send(JSON.stringify(Object.assign({ type: 'trigger', action: action }, data || {})));
     }
 
-    function addTriggerRule(keyword, command) {
+    function addTriggerRule(keyword, command, delay) {
         const row = document.createElement('div');
         row.className = 'trigger-rule-row';
         row.innerHTML =
             '<input type="text" class="trigger-keyword" placeholder="消息关键词" value="' + escapeAttr(keyword || '') + '">' +
             '<input type="text" class="trigger-command" placeholder="发送指令" value="' + escapeAttr(command || '') + '">' +
-            '<button class="trigger-small-btn danger" type="button">×</button>';
-        row.querySelector('button').addEventListener('click', function() {
-            row.remove();
-        });
+            '<input type="number" class="trigger-delay" placeholder="延时秒" min="0" max="3600" step="0.1" value="' + escapeAttr(delay || '') + '">' +
+            '<button class="trigger-small-btn danger trigger-rule-delete" type="button">×</button>';
         triggerRulesEl.appendChild(row);
     }
 
@@ -1309,7 +1307,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         const rules = config.rules || [];
         if (!rules.length) addTriggerRule('', '');
         rules.forEach(function(rule) {
-            addTriggerRule(rule.keyword, rule.command);
+            addTriggerRule(rule.keyword, rule.command, rule.delay || '');
         });
     }
 
@@ -1318,7 +1316,11 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         triggerRulesEl.querySelectorAll('.trigger-rule-row').forEach(function(row) {
             const keyword = row.querySelector('.trigger-keyword').value.trim();
             const command = row.querySelector('.trigger-command').value.trim();
-            if (keyword && command) rules.push({ keyword: keyword, command: command });
+            const delayRaw = row.querySelector('.trigger-delay').value.trim();
+            let delay = parseFloat(delayRaw);
+            if (!Number.isFinite(delay) || delay < 0) delay = 0;
+            if (delay > 3600) delay = 3600;
+            if (keyword && command) rules.push({ keyword: keyword, command: command, delay: delay });
         });
         return {
             name: triggerNameEl.value.trim(),
@@ -1336,7 +1338,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             '规则:',
         ];
         (config.rules || []).forEach(function(rule, index) {
-            lines.push((index + 1) + '. ' + rule.keyword + ' -> ' + rule.command);
+            const delay = Number(rule.delay || 0);
+            const suffix = delay > 0 ? '（延时 ' + delay + ' 秒）' : '';
+            lines.push((index + 1) + '. ' + rule.keyword + ' -> ' + rule.command + suffix);
         });
         if (config.notes) {
             lines.push('', '备注:', config.notes);
@@ -1442,6 +1446,16 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     triggerAddRuleBtn.addEventListener('click', function() {
         addTriggerRule('', '');
+    });
+
+    triggerRulesEl.addEventListener('click', function(e) {
+        var btn = e.target.closest('.trigger-rule-delete');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var row = btn.closest('.trigger-rule-row');
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+        setTriggerStatus('已删除分支，保存后生效', 'ok');
     });
 
     triggerNewBtn.addEventListener('click', function() {

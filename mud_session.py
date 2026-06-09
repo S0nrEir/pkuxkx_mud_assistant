@@ -131,7 +131,14 @@ class MudSession:
         commands = self._split_trigger_commands(rule.get('command'))
         if not commands:
             return
+        try:
+            delay = float(rule.get('delay') or 0)
+        except (TypeError, ValueError):
+            delay = 0
+        delay = max(0, min(delay, 3600))
         async with self._trigger_lock:
+            if delay:
+                await asyncio.sleep(delay)
             for command in commands:
                 await self._send_mud_command(command)
                 if len(commands) > 1:
