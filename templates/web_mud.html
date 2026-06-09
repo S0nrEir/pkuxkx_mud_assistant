@@ -344,8 +344,8 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
 /* 右侧面板 */
 .side-panel {
-    width: 18%;
-    min-width: 200px;
+    width: 24%;
+    min-width: 260px;
     display: flex;
     flex-direction: column;
     border-left: 1px solid #30363d;
@@ -356,6 +356,13 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     flex-direction: column;
     flex: 1;
     min-height: 0;
+}
+.panel-section.history-section {
+    flex: 0 0 20%;
+    min-height: 90px;
+}
+.panel-section.chat-section {
+    flex: 1 1 auto;
 }
 .panel-section + .panel-section { border-top: 1px solid #30363d; }
 .panel-header {
@@ -492,13 +499,13 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     </div>
     </div>
     <div class="side-panel">
-        <div class="panel-section">
+        <div class="panel-section history-section">
             <div class="panel-header">命令历史</div>
             <div class="panel-body" id="cmdHistory">
                 <div class="empty-hint">暂无命令</div>
             </div>
         </div>
-        <div class="panel-section">
+        <div class="panel-section chat-section">
             <div class="panel-header">聊天频道</div>
             <div class="panel-body" id="chatPanel">
                 <div class="empty-hint">等待聊天消息...</div>
