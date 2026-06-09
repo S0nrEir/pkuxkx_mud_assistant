@@ -32,7 +32,7 @@ def normalize_config(config):
         except (TypeError, ValueError):
             delay = 0
         delay = max(0, min(delay, 3600))
-        if keyword and command:
+        if keyword or command:
             clean_rules.append({'keyword': keyword, 'command': command, 'delay': delay})
     return {
         'name': str(config.get('name') or '').strip(),
@@ -118,6 +118,6 @@ class TriggerRuntime:
         text = str(text or '')
         matched = []
         for rule in self.config.get('rules') or []:
-            if rule['keyword'] in text:
+            if rule['keyword'] and rule['command'] and rule['keyword'] in text:
                 matched.append(rule)
         return matched

@@ -204,6 +204,11 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .trigger-status.error { color: #f85149; }
 .trigger-status.ok { color: #7ee787; }
+.trigger-tip {
+    color: #8b949e;
+    font-size: 11px;
+    line-height: 1.4;
+}
 
 /* 中间终端 */
 .terminal-panel {
@@ -430,6 +435,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                     </div>
                     <div class="trigger-field">
                         <label>分支规则：服务器消息关键词 → 发送指令</label>
+                        <div class="trigger-tip">延时秒不填默认 0；不能填写负数。</div>
                         <div id="triggerRules"></div>
                     </div>
                     <div class="trigger-actions">
@@ -1211,11 +1217,11 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     // ─── 工具函数 ───
     function escapeHtml(s) {
         const div = document.createElement('div');
-        div.textContent = s;
+        div.textContent = String(s == null ? '' : s);
         return div.innerHTML;
     }
     function escapeAttr(s) {
-        return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     // ─── 设置持久化 ───
@@ -1313,15 +1319,24 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     function getTriggerFormConfig() {
         const rules = [];
+        let hasNegativeDelay = false;
         triggerRulesEl.querySelectorAll('.trigger-rule-row').forEach(function(row) {
             const keyword = row.querySelector('.trigger-keyword').value.trim();
             const command = row.querySelector('.trigger-command').value.trim();
             const delayRaw = row.querySelector('.trigger-delay').value.trim();
             let delay = parseFloat(delayRaw);
-            if (!Number.isFinite(delay) || delay < 0) delay = 0;
+            if (Number.isFinite(delay) && delay < 0) {
+                hasNegativeDelay = true;
+                row.querySelector('.trigger-delay').focus();
+                return;
+            }
+            if (!Number.isFinite(delay)) delay = 0;
             if (delay > 3600) delay = 3600;
-            if (keyword && command) rules.push({ keyword: keyword, command: command, delay: delay });
+            if (keyword || command) rules.push({ keyword: keyword, command: command, delay: delay });
         });
+        if (hasNegativeDelay) {
+            return null;
+        }
         return {
             name: triggerNameEl.value.trim(),
             notes: triggerNotesEl.value,
@@ -1463,7 +1478,13 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     });
 
     triggerSaveBtn.addEventListener('click', function() {
-        sendTriggerMessage('save', { id: selectedTriggerId, config: getTriggerFormConfig() });
+        const config = getTriggerFormConfig();
+        if (!config) {
+            setTriggerStatus('延时秒不能填写负数', 'error');
+            alert('延时秒不能填写负数');
+            return;
+        }
+        sendTriggerMessage('save', { id: selectedTriggerId, config: config });
     });
 
     triggerStopBtn.addEventListener('click', function() {
