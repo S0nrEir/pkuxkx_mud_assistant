@@ -6,6 +6,7 @@ import re
 
 
 TRIGGER_DIR = os.path.join(os.path.dirname(__file__), 'triggers')
+_CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
 
 
 def _safe_id(name):
@@ -115,7 +116,7 @@ class TriggerRuntime:
     def match(self, text):
         if not self.config:
             return []
-        text = str(text or '')
+        text = _CLEAN_RE.sub('', str(text or ''))
         matched = []
         for rule in self.config.get('rules') or []:
             if rule['keyword'] and rule['command'] and rule['keyword'] in text:

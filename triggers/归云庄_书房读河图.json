@@ -1,15 +1,15 @@
 {
-  "name": "归云庄_书房读易经",
+  "name": "归云庄_书房读河图",
   "notes": "",
   "rules": [
     {
       "keyword": "你研读了",
-      "command": "du yi jing for 5",
+      "command": "du he tu for 5",
       "delay": 0
     },
     {
       "keyword": "你现在过于疲倦，无法专心下来研读新知。",
-      "command": "du yi jing for 5",
+      "command": "du he tu for 5",
       "delay": 30.0
     }
   ]

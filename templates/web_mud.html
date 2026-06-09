@@ -103,6 +103,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .toolbar-btn:hover { background: #30363d; }
 .toolbar-btn.danger { color: #f85149; border-color: #da3633; }
 .toolbar-btn.danger:hover { background: #da3633; color: #fff; }
+.toolbar-trigger-current {
+    color: #8b949e;
+    font-size: 12px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.toolbar-trigger-current span {
+    color: #7ee787;
+    font-weight: 700;
+}
 .trigger-panel {
     position: absolute;
     top: 36px;
@@ -116,8 +128,21 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     z-index: 30;
     display: none;
     grid-template-columns: 42% 58%;
+    grid-template-rows: auto 1fr;
 }
 .trigger-panel.open { display: grid; }
+.trigger-current {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+    border-bottom: 1px solid #30363d;
+    color: #c9d1d9;
+    font-size: 12px;
+    background: #0d1117;
+}
+.trigger-current span {
+    color: #7ee787;
+    font-weight: 700;
+}
 .trigger-browser {
     border-right: 1px solid #30363d;
     display: flex;
@@ -412,8 +437,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     <div class="center-area">
         <div class="toolbar">
             <button class="toolbar-btn" id="btnTriggers">触发器</button>
+            <div class="toolbar-trigger-current">当前触发器：<span id="toolbarTriggerCurrentName">无</span></div>
             <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
             <div class="trigger-panel" id="triggerPanel">
+                <div class="trigger-current">当前加载：<span id="triggerCurrentName">无</span></div>
                 <div class="trigger-browser">
                     <div class="trigger-list" id="triggerList">
                         <div class="empty-hint">暂无触发器</div>
@@ -544,6 +571,8 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const scrollBottomBtn = document.getElementById('scrollBottomBtn');
     const btnTriggers = document.getElementById('btnTriggers');
     const triggerPanel = document.getElementById('triggerPanel');
+    const toolbarTriggerCurrentNameEl = document.getElementById('toolbarTriggerCurrentName');
+    const triggerCurrentNameEl = document.getElementById('triggerCurrentName');
     const triggerListEl = document.getElementById('triggerList');
     const triggerDetailEl = document.getElementById('triggerDetail');
     const triggerLoadBtn = document.getElementById('triggerLoadBtn');
@@ -1363,8 +1392,20 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         return lines.join('\n');
     }
 
+    function updateActiveTriggerDisplay() {
+        var item = triggerItems.find(function(x) { return x.id === activeTriggerId; });
+        setActiveTriggerDisplay(activeTriggerId ? ((item && item.name) || activeTriggerId) : '无');
+    }
+
+    function setActiveTriggerDisplay(name) {
+        var text = name || '无';
+        triggerCurrentNameEl.textContent = text;
+        toolbarTriggerCurrentNameEl.textContent = text;
+    }
+
     function renderTriggerList(items) {
         triggerItems = items || [];
+        updateActiveTriggerDisplay();
         if (!triggerItems.length) {
             triggerListEl.innerHTML = '<div class="empty-hint">暂无触发器</div>';
             triggerDetailEl.textContent = '选择一个触发器查看详情';
@@ -1427,6 +1468,13 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         if (msg.active === false) activeTriggerId = '';
         if (msg.id) selectedTriggerId = msg.id;
         if (msg.status) setTriggerStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+        if (msg.active === false) {
+            setActiveTriggerDisplay('无');
+        } else if (msg.id && msg.active && msg.config) {
+            setActiveTriggerDisplay(msg.config.name || msg.id);
+        } else {
+            updateActiveTriggerDisplay();
+        }
         renderTriggerList(triggerItems);
         if (activeTriggerId && !selectedTriggerId) selectedTriggerId = activeTriggerId;
         if (selectedTriggerId) selectTrigger(selectedTriggerId);

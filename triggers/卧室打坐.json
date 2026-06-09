@@ -1,0 +1,31 @@
+{
+  "name": "卧室打坐",
+  "notes": "可睡觉的地方打坐练功",
+  "rules": [
+    {
+      "keyword": "你运功完毕，深深吸了口气",
+      "command": "dazuo 10",
+      "delay": 0
+    },
+    {
+      "keyword": "你的内力增加了",
+      "command": "dazuo max",
+      "delay": 0
+    },
+    {
+      "keyword": "你现在气血严重不足，无法满足打坐最小要求",
+      "command": "sleep",
+      "delay": 0
+    },
+    {
+      "keyword": "你现在的气太少了，无法产生内息运行全身经脉。",
+      "command": "sleep",
+      "delay": 0
+    },
+    {
+      "keyword": "你一觉醒来，精神抖擞地活动了几下手脚",
+      "command": "dazuo max",
+      "delay": 0
+    }
+  ]
+}
