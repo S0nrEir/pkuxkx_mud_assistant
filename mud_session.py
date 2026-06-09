@@ -59,6 +59,8 @@ class MudSession:
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
         self._trigger_lock = asyncio.Lock()
+        self._trigger_tasks = set()
+        self._trigger_generation = 0
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -91,6 +93,7 @@ class MudSession:
 
     async def cleanup(self):
         self.running = False
+        self._cancel_trigger_tasks()
         if self.writer:
             try:
                 self.writer.close()
@@ -127,9 +130,22 @@ class MudSession:
                 commands.append(part)
         return commands
 
-    async def _run_trigger_rule(self, rule):
+    def _cancel_trigger_tasks(self):
+        self._trigger_generation += 1
+        for task in list(self._trigger_tasks):
+            task.cancel()
+        self._trigger_tasks.clear()
+
+    def _trigger_is_current(self, active_id, generation):
+        return (
+            self.triggers.active
+            and self.triggers.active_id == active_id
+            and self._trigger_generation == generation
+        )
+
+    async def _run_trigger_rule(self, rule, active_id, generation):
         commands = self._split_trigger_commands(rule.get('command'))
-        if not commands:
+        if not commands or not self._trigger_is_current(active_id, generation):
             return
         try:
             delay = float(rule.get('delay') or 0)
@@ -137,9 +153,15 @@ class MudSession:
             delay = 0
         delay = max(0, min(delay, 3600))
         async with self._trigger_lock:
+            if not self._trigger_is_current(active_id, generation):
+                return
             if delay:
                 await asyncio.sleep(delay)
+                if not self._trigger_is_current(active_id, generation):
+                    return
             for command in commands:
+                if not self._trigger_is_current(active_id, generation):
+                    return
                 await self._send_mud_command(command)
                 if len(commands) > 1:
                     await asyncio.sleep(0.35)
@@ -167,6 +189,7 @@ class MudSession:
                 was_active = bool(original_id and self.triggers.active_id == original_id)
                 trigger_id, config_data = save_config(msg.get('config') or {}, original_id)
                 if was_active or self.triggers.active_id == trigger_id:
+                    self._cancel_trigger_tasks()
                     self.triggers.load(trigger_id, config_data)
             except ValueError as e:
                 await self._send_ws_json({'type': 'trigger_status', 'ok': False, 'status': f'保存失败：{e}'})
@@ -187,6 +210,7 @@ class MudSession:
         if action == 'load':
             try:
                 trigger_id = msg.get('id') or ''
+                self._cancel_trigger_tasks()
                 config_data = self.triggers.load(trigger_id, load_config(trigger_id))
             except Exception as e:
                 await self._send_ws_json({'type': 'trigger_status', 'ok': False, 'status': f'加载失败：{e}'})
@@ -205,12 +229,14 @@ class MudSession:
         if action == 'delete':
             trigger_id = msg.get('id') or ''
             if self.triggers.active_id == trigger_id:
+                self._cancel_trigger_tasks()
                 self.triggers.stop()
             delete_config(trigger_id)
             await self._send_trigger_list('已删除触发器')
             return
 
         if action == 'stop':
+            self._cancel_trigger_tasks()
             self.triggers.stop()
             await self._send_ws_json({
                 'type': 'trigger_status',
@@ -221,8 +247,12 @@ class MudSession:
             await self._send_trigger_list()
 
     async def _handle_trigger_text(self, text):
+        active_id = self.triggers.active_id
+        generation = self._trigger_generation
         for rule in self.triggers.match(text):
-            asyncio.create_task(self._run_trigger_rule(rule))
+            task = asyncio.create_task(self._run_trigger_rule(rule, active_id, generation))
+            self._trigger_tasks.add(task)
+            task.add_done_callback(self._trigger_tasks.discard)
 
     # ─── 小地图检测辅助函数 ───
     _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
