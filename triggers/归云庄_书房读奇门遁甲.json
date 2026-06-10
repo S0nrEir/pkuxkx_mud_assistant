@@ -9,8 +9,23 @@
     },
     {
       "keyword": "你现在过于疲倦，无法专心下来研读新知。",
-      "command": "du qimen dunjia for 5",
-      "delay": 30.0
+      "command": "n;n;n;e;sleep",
+      "delay": 0
+    },
+    {
+      "keyword": "你刚刚睡过一觉",
+      "command": "sleep",
+      "delay": 5.0
+    },
+    {
+      "keyword": "你一觉醒来，精神抖擞地活动了几下手脚。",
+      "command": "w;s;s;s;du qimen dunjia for 5",
+      "delay": 0
+    },
+    {
+      "keyword": "一觉酣睡，万般烦忧皆付梦中，醒来只觉神清气爽",
+      "command": "w;s;s;s;du qimen dunjia for 5",
+      "delay": 0
     }
   ]
 }
