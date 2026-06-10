@@ -30,13 +30,36 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
 }
 .tab-btn:hover { color: #c9d1d9; background: #21262d; }
 .tab-btn.active { color: #fff; background: #238636; border-color: #2ea043; }
+.tab-btn:active { transform: translateY(1px) scale(0.98); }
+.tab-btn.tab-hit { animation: softFlash 0.32s ease-out; }
 .top-tabs .toolbar-trigger-current { flex: 1; }
 .page { flex: 1; min-height: 0; display: none; }
-.page.active { display: flex; }
+.page.active { display: flex; animation: pageFadeSlide 0.18s ease-out; }
 .container { display: flex; height: 100%; width: 100%; min-height: 0; }
+
+@keyframes pageFadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes triggerItemIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes subtlePulse {
+    0%, 100% { opacity: 1; text-shadow: none; }
+    50% { opacity: 0.78; text-shadow: 0 0 8px rgba(63, 185, 80, 0.55); }
+}
+
+@keyframes softFlash {
+    from { background: rgba(88, 166, 255, 0.14); }
+    to { background: transparent; }
+}
 
 /* 左侧面板（设置 + 地图） */
 .left-panel {
@@ -125,9 +148,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     font-size: 12px;
     cursor: pointer;
     font-family: inherit;
-    transition: background 0.15s;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
 }
 .toolbar-btn:hover { background: #30363d; }
+.toolbar-btn:active { transform: scale(0.98); }
 .toolbar-btn.danger { color: #f85149; border-color: #da3633; }
 .toolbar-btn.danger:hover { background: #da3633; color: #fff; }
 .toolbar-trigger-current {
@@ -178,12 +202,16 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     border-bottom: 1px solid #21262d;
     cursor: pointer;
     font-size: 12px;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.14s ease, border-color 0.16s ease;
 }
 .trigger-item:hover,
 .trigger-item.active { background: #1f2937; color: #79c0ff; }
+.trigger-item:hover { transform: translateX(-2px); }
 .trigger-item.loaded { background: #1a2f1e; border-left: 3px solid #3fb950; }
-.trigger-item.loaded.active { background: #1a3424; }
-.trigger-loaded-badge { color: #3fb950; font-size: 10px; font-weight: 400; margin-left: 6px; }
+.trigger-item.active { box-shadow: inset 3px 0 0 #58a6ff; }
+.trigger-item.loaded.active { background: #1a3424; box-shadow: inset 3px 0 0 #3fb950; }
+.trigger-item.list-enter { animation: triggerItemIn 0.22s ease-out both; }
+.trigger-loaded-badge { color: #3fb950; font-size: 10px; font-weight: 400; margin-left: 6px; animation: subtlePulse 1.8s ease-in-out infinite; }
 .trigger-item-title { font-weight: 700; margin-bottom: 3px; }
 .trigger-item-meta { color: #8b949e; font-size: 11px; }
 .trigger-detail {
@@ -194,6 +222,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     white-space: pre-wrap;
     color: #c9d1d9;
 }
+.trigger-detail.flash { animation: softFlash 0.45s ease-out; }
 .trigger-actions {
     display: flex;
     gap: 6px;
@@ -229,9 +258,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     font-size: 12px;
     cursor: pointer;
     font-family: inherit;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
 }
 .trigger-small-btn:hover { background: #30363d; }
+.trigger-small-btn:active { transform: scale(0.97); }
 .trigger-small-btn.primary { background: #238636; border-color: #2ea043; color: #fff; }
+.trigger-small-btn.primary:hover { box-shadow: 0 0 0 2px rgba(46, 160, 67, 0.2); }
 .trigger-small-btn.danger { color: #f85149; border-color: #da3633; }
 .trigger-status {
     min-height: 16px;
@@ -242,7 +274,16 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .trigger-status.error { color: #f85149; }
 .trigger-status.ok { color: #7ee787; }
+.trigger-status.flash { animation: softFlash 0.45s ease-out; }
 .trigger-tip { color: #8b949e; font-size: 11px; line-height: 1.4; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+}
 
 .terminal-panel {
     flex: 1;
@@ -1321,6 +1362,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     function setTriggerStatus(text, kind) {
         triggerStatusEl.textContent = text || '';
         triggerStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
+        triggerStatusEl.classList.remove('flash');
+        void triggerStatusEl.offsetWidth;
+        triggerStatusEl.classList.add('flash');
     }
 
     function sendTriggerMessage(action, data) {
@@ -1353,6 +1397,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         selectedTriggerId = '';
         clearTriggerForm();
         triggerDetailEl.textContent = '正在新建触发器';
+        triggerDetailEl.classList.remove('flash');
+        void triggerDetailEl.offsetWidth;
+        triggerDetailEl.classList.add('flash');
         triggerLoadBtn.disabled = true;
         triggerDeleteBtn.disabled = true;
         triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
@@ -1451,6 +1498,10 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 '<div class="trigger-item-meta">' + item.rules_count + ' 个分支</div>' +
                 '</div>';
         }).join('');
+        triggerListEl.querySelectorAll('.trigger-item').forEach(function(el, index) {
+            el.classList.add('list-enter');
+            el.style.animationDelay = Math.min(index * 18, 180) + 'ms';
+        });
         triggerLoadBtn.disabled = !selectedTriggerId || (selectedTriggerId === activeTriggerId);
     }
 
@@ -1458,6 +1509,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         selectedTriggerId = id || '';
         var item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
         triggerDetailEl.textContent = formatTriggerDetail(item && item.config);
+        triggerDetailEl.classList.remove('flash');
+        void triggerDetailEl.offsetWidth;
+        triggerDetailEl.classList.add('flash');
         if (item && item.config) fillTriggerForm(item.config);
         triggerDeleteBtn.disabled = !item;
         triggerLoadBtn.disabled = !item || (selectedTriggerId === activeTriggerId);
@@ -1520,6 +1574,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             document.querySelectorAll('.page').forEach(function(page) {
                 page.classList.toggle('active', page.id === pageId);
             });
+            btn.classList.remove('tab-hit');
+            void btn.offsetWidth;
+            btn.classList.add('tab-hit');
             if (pageId === 'triggerPage') sendTriggerMessage('list');
             if (pageId === 'gamePage') setTimeout(function() { fitAddon.fit(); }, 0);
         });
