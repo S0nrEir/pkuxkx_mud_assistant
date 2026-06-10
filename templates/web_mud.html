@@ -542,11 +542,11 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 <div class="trigger-detail" id="triggerDetail">选择一个触发器查看详情</div>
                 <div class="trigger-actions trigger-main-actions">
                     <button class="trigger-small-btn primary" id="triggerLoadBtn" disabled>加载</button>
-                    <button class="trigger-small-btn danger" id="triggerDeleteBtn" disabled>删除</button>
                     <button class="trigger-small-btn" id="triggerNewBtn">新建</button>
                     <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
                     <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
                     <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
+                    <button class="trigger-small-btn danger" id="triggerDeleteBtn" disabled>删除</button>
                 </div>
                 <div class="trigger-status" id="triggerStatus">未加载触发器</div>
                 <div class="trigger-editor">
@@ -1596,6 +1596,9 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     triggerDeleteBtn.addEventListener('click', function() {
         if (!selectedTriggerId) return;
+        var item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
+        var name = item ? (item.name || item.id) : selectedTriggerId;
+        if (!confirm('确定要删除触发器「' + name + '」吗？')) return;
         sendTriggerMessage('delete', { id: selectedTriggerId });
     });
 
