@@ -26,6 +26,11 @@
       "keyword": "你一觉醒来，精神抖擞地活动了几下手脚。",
       "command": "w;s;w;w;xue lu for fuxue-shou 10",
       "delay": 0
+    },
+    {
+      "keyword": "你向陆冠英请教",
+      "command": "xue lu for fuxue-shou 10",
+      "delay": 0
     }
   ]
 }

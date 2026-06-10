@@ -19,12 +19,22 @@
     },
     {
       "keyword": "你一觉醒来，精神抖擞地活动了几下手脚。",
-      "command": "tuna 10",
+      "command": "tuna max",
       "delay": 0
     },
     {
       "keyword": "一觉酣睡，万般烦忧皆付梦中，醒来只觉神清气爽",
+      "command": "tuna max",
+      "delay": 0
+    },
+    {
+      "keyword": "你现在精力接近圆满状态。",
       "command": "tuna 10",
+      "delay": 0
+    },
+    {
+      "keyword": "你现在精严重不足，无法满足吐纳最小要求",
+      "command": "sleep",
       "delay": 0
     }
   ]
