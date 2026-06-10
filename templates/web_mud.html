@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7; font-family: 'Consolas', 'Courier New', monospace; }
+html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7; font-family: 'Sarasa Mono SC', 'Cascadia Mono', 'Microsoft YaHei Mono', Consolas, monospace; }
 
 .app-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
 .top-tabs {
@@ -241,7 +241,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     border: 1px solid #30363d;
     border-radius: 4px;
     color: #d4dce7;
-    font-family: 'Consolas', 'Courier New', monospace;
+    font-family: 'Sarasa Mono SC', 'Cascadia Mono', 'Microsoft YaHei Mono', Consolas, monospace;
     font-size: 12px;
     padding: 5px 6px;
     outline: none;
@@ -369,7 +369,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     border-radius: 4px;
     padding: 6px 12px;
     color: #d4dce7;
-    font-family: 'Consolas', 'Courier New', monospace;
+    font-family: 'Sarasa Mono SC', 'Cascadia Mono', 'Microsoft YaHei Mono', Consolas, monospace;
     font-size: 14px;
     outline: none;
 }
@@ -583,7 +583,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     // ─── 终端初始化 ───
     const term = new Terminal({
         fontSize: 15,
-        fontFamily: 'Consolas, "Courier New", monospace',
+        fontFamily: '"Sarasa Mono SC", "Cascadia Mono", "Microsoft YaHei Mono", Consolas, monospace',
         theme: {
             background: '#0f1419',
             foreground: '#e6e1cf',
@@ -1640,7 +1640,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const mapFitAddon = new FitAddon.FitAddon();
     const mapTerm = new Terminal({
         fontSize: 12,
-        fontFamily: 'Consolas, "Courier New", monospace',
+        fontFamily: '"Sarasa Mono SC", "Cascadia Mono", "Microsoft YaHei Mono", Consolas, monospace',
         theme: {
             background: '#0d1117',
             foreground: '#e6e1cf',
