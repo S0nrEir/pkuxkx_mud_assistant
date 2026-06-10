@@ -1,0 +1,27 @@
+{
+  "name": "陆冠英_学基本内功",
+  "notes": "起点需在陆冠英所在归云亭；累了自动 e;e;n;e 到休息室 sleep，睡好后 w;s;w;w 返回继续向陆冠英学习基本内功。",
+  "rules": [
+    {
+      "keyword": "你听了陆冠英的指导，似乎有些心得。",
+      "command": "xue lu for force 10",
+      "delay": 0
+    },
+    {
+      "keyword": "你今天太累了，结果什么也没有学到。",
+      "command": "e;e;n;e;sleep",
+      "delay": 0
+    },
+    {
+      "keyword": "刚刚睡过还不能睡",
+      "command": "sleep",
+      "delay": 10
+    },
+    {
+      "keyword": "一觉酣睡，万般烦忧皆付梦中，醒来只觉神清气爽",
+      "command": "w;s;w;w;xue lu for force 10",
+      "delay": 0
+    }
+  ]
+}
+
