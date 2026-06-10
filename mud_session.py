@@ -60,7 +60,12 @@ class MudSession:
         self.triggers = TriggerRuntime()
         self._trigger_lock = asyncio.Lock()
         self._trigger_tasks = set()
+        self._trigger_queue = []
+        self._trigger_waiting_response = False
+        self._trigger_response_parts = []
+        self._trigger_waiting_chunk = 0
         self._trigger_generation = 0
+        self._mud_chunk_seq = 0
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -114,6 +119,8 @@ class MudSession:
             return
         self.writer.write((command + '\r\n').encode('gbk', errors='replace'))
         await self.writer.drain()
+        self._trigger_response_parts = []
+        self._trigger_waiting_chunk = self._mud_chunk_seq
         self._log_data(command, 'send')
         await self._send_ws_json({
             'type': 'trigger_event',
@@ -135,6 +142,10 @@ class MudSession:
         for task in list(self._trigger_tasks):
             task.cancel()
         self._trigger_tasks.clear()
+        self._trigger_queue.clear()
+        self._trigger_waiting_response = False
+        self._trigger_response_parts = []
+        self._trigger_waiting_chunk = 0
 
     def _trigger_is_current(self, active_id, generation):
         return (
@@ -142,6 +153,43 @@ class MudSession:
             and self.triggers.active_id == active_id
             and self._trigger_generation == generation
         )
+
+    def _queue_trigger_commands(self, commands, active_id, generation):
+        for command in commands:
+            self._trigger_queue.append({
+                'command': command,
+                'active_id': active_id,
+                'generation': generation,
+            })
+
+    async def _advance_trigger_queue(self):
+        if self._trigger_waiting_response or not self._trigger_queue:
+            return
+        item = None
+        while self._trigger_queue:
+            candidate = self._trigger_queue.pop(0)
+            if self._trigger_is_current(candidate['active_id'], candidate['generation']):
+                item = candidate
+                break
+        if not item:
+            return
+        self._trigger_waiting_response = True
+        await self._send_mud_command(item['command'])
+
+    async def _finish_trigger_response(self):
+        if not self._trigger_waiting_response:
+            return
+        if self._trigger_waiting_chunk >= self._mud_chunk_seq:
+            return
+        response_text = '\n'.join(self._trigger_response_parts)
+        self._trigger_response_parts = []
+        self._trigger_waiting_response = False
+        self._trigger_waiting_chunk = 0
+        if self._trigger_queue:
+            await self._advance_trigger_queue()
+            return
+        if response_text.strip():
+            await self._match_trigger_text(response_text)
 
     async def _run_trigger_rule(self, rule, active_id, generation):
         commands = self._split_trigger_commands(rule.get('command'))
@@ -159,12 +207,8 @@ class MudSession:
                 await asyncio.sleep(delay)
                 if not self._trigger_is_current(active_id, generation):
                     return
-            for command in commands:
-                if not self._trigger_is_current(active_id, generation):
-                    return
-                await self._send_mud_command(command)
-                if len(commands) > 1:
-                    await asyncio.sleep(0.35)
+            self._queue_trigger_commands(commands, active_id, generation)
+            await self._advance_trigger_queue()
 
     async def _send_trigger_list(self, status=''):
         payload = {
@@ -247,12 +291,23 @@ class MudSession:
             await self._send_trigger_list()
 
     async def _handle_trigger_text(self, text):
+        if self._trigger_waiting_response:
+            self._trigger_response_parts.append(str(text or ''))
+            return
+
+        await self._match_trigger_text(text)
+
+    async def _match_trigger_text(self, text):
+        if self._trigger_queue or self._trigger_waiting_response:
+            return
         active_id = self.triggers.active_id
         generation = self._trigger_generation
-        for rule in self.triggers.match(text):
-            task = asyncio.create_task(self._run_trigger_rule(rule, active_id, generation))
-            self._trigger_tasks.add(task)
-            task.add_done_callback(self._trigger_tasks.discard)
+        matches = self.triggers.match(text)
+        if not matches:
+            return
+        task = asyncio.create_task(self._run_trigger_rule(matches[0], active_id, generation))
+        self._trigger_tasks.add(task)
+        task.add_done_callback(self._trigger_tasks.discard)
 
     # ─── 小地图检测辅助函数 ───
     _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
@@ -316,6 +371,7 @@ class MudSession:
 
             # 1. 剥离 Telnet IAC 并回应协商
             clean = await strip_iac_and_respond(data, self.writer)
+            self._mud_chunk_seq += 1
 
             # 2. 累积到原始字节缓冲区
             self._raw_buf.extend(clean)
@@ -449,6 +505,8 @@ class MudSession:
                         await asyncio.sleep(0.5)
                         self.writer.write(b'\r\n')
                         await self.writer.drain()
+
+            await self._finish_trigger_response()
 
     # ─── 读取浏览器 WebSocket ───
     async def _read_ws_loop(self):
