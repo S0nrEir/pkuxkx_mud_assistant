@@ -148,7 +148,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     width: 100%;
     background: #161b22;
     display: grid;
-    grid-template-columns: minmax(300px, 34%) minmax(420px, 66%);
+    grid-template-columns: minmax(480px, 58%) minmax(300px, 42%);
     border-top: 1px solid #30363d;
 }
 .trigger-current {
@@ -159,14 +159,20 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     background: #0d1117;
 }
 .trigger-current span { color: #7ee787; font-weight: 700; }
-.trigger-browser {
+.trigger-main {
     border-right: 1px solid #30363d;
     display: grid;
-    grid-template-rows: auto minmax(120px, 24%) auto auto 1fr;
+    grid-template-rows: auto minmax(120px, 22%) auto auto 1fr;
     min-width: 0;
     min-height: 0;
 }
-.trigger-list { min-height: 0; overflow-y: auto; }
+.trigger-browser {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+.trigger-list { flex: 1; min-height: 0; overflow-y: auto; border-left: 1px solid #21262d; }
 .trigger-item {
     padding: 8px 10px;
     border-bottom: 1px solid #21262d;
@@ -490,7 +496,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     <div class="page" id="triggerPage">
         <div class="trigger-panel" id="triggerPanel">
-            <div class="trigger-browser">
+            <div class="trigger-main">
                 <div class="trigger-current">当前加载：<span id="triggerCurrentName">无</span></div>
                 <div class="trigger-detail" id="triggerDetail">选择一个触发器查看详情</div>
                 <div class="trigger-actions trigger-main-actions">
@@ -502,23 +508,26 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                     <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
                 </div>
                 <div class="trigger-status" id="triggerStatus">未加载触发器</div>
-                <div class="trigger-list" id="triggerList">
-                    <div class="empty-hint">暂无触发器</div>
+                <div class="trigger-editor">
+                    <div class="trigger-field">
+                        <label for="triggerName">触发器名称</label>
+                        <input type="text" id="triggerName" placeholder="例如：读书恢复">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="triggerNotes">备注</label>
+                        <textarea id="triggerNotes" placeholder="可写用途、地点或注意事项"></textarea>
+                    </div>
+                    <div class="trigger-field">
+                        <label>分支规则：服务器消息关键词 → 发送指令</label>
+                        <div class="trigger-tip">延时秒不填默认 0；不能填写负数。</div>
+                        <div id="triggerRules"></div>
+                    </div>
                 </div>
             </div>
-            <div class="trigger-editor">
-                <div class="trigger-field">
-                    <label for="triggerName">触发器名称</label>
-                    <input type="text" id="triggerName" placeholder="例如：读书恢复">
-                </div>
-                <div class="trigger-field">
-                    <label for="triggerNotes">备注</label>
-                    <textarea id="triggerNotes" placeholder="可写用途、地点或注意事项"></textarea>
-                </div>
-                <div class="trigger-field">
-                    <label>分支规则：服务器消息关键词 → 发送指令</label>
-                    <div class="trigger-tip">延时秒不填默认 0；不能填写负数。</div>
-                    <div id="triggerRules"></div>
+            <div class="trigger-browser">
+                <div class="trigger-current">所有触发器</div>
+                <div class="trigger-list" id="triggerList">
+                    <div class="empty-hint">暂无触发器</div>
                 </div>
             </div>
         </div>
