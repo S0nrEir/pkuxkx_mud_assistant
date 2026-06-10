@@ -9,7 +9,34 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7; font-family: 'Consolas', 'Courier New', monospace; }
 
-.container { display: flex; height: 100vh; }
+.app-shell { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+.top-tabs {
+    height: 38px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    flex-shrink: 0;
+}
+.tab-buttons { display: flex; gap: 4px; }
+.tab-btn {
+    background: transparent;
+    color: #8b949e;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.tab-btn:hover { color: #c9d1d9; background: #21262d; }
+.tab-btn.active { color: #fff; background: #238636; border-color: #2ea043; }
+.top-tabs .toolbar-trigger-current { flex: 1; }
+.page { flex: 1; min-height: 0; display: none; }
+.page.active { display: flex; }
+.container { display: flex; height: 100%; width: 100%; min-height: 0; }
 
 /* 左侧面板（设置 + 地图） */
 .left-panel {
@@ -116,40 +143,30 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     font-weight: 700;
 }
 .trigger-panel {
-    position: absolute;
-    top: 36px;
-    left: 25%;
-    width: 50vw;
-    height: 50vh;
-    min-width: 620px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
     background: #161b22;
-    border: 1px solid #30363d;
-    box-shadow: 0 16px 42px rgba(0,0,0,0.5);
-    z-index: 30;
-    display: none;
-    grid-template-columns: 42% 58%;
-    grid-template-rows: auto 1fr;
+    display: grid;
+    grid-template-columns: minmax(300px, 34%) minmax(420px, 66%);
+    border-top: 1px solid #30363d;
 }
-.trigger-panel.open { display: grid; }
 .trigger-current {
-    grid-column: 1 / -1;
-    padding: 8px 10px;
+    padding: 10px 12px;
     border-bottom: 1px solid #30363d;
     color: #c9d1d9;
     font-size: 12px;
     background: #0d1117;
 }
-.trigger-current span {
-    color: #7ee787;
-    font-weight: 700;
-}
+.trigger-current span { color: #7ee787; font-weight: 700; }
 .trigger-browser {
     border-right: 1px solid #30363d;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(120px, 24%) auto auto 1fr;
     min-width: 0;
+    min-height: 0;
 }
-.trigger-list { flex: 1; overflow-y: auto; }
+.trigger-list { min-height: 0; overflow-y: auto; }
 .trigger-item {
     padding: 8px 10px;
     border-bottom: 1px solid #21262d;
@@ -164,10 +181,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .trigger-item-title { font-weight: 700; margin-bottom: 3px; }
 .trigger-item-meta { color: #8b949e; font-size: 11px; }
 .trigger-detail {
-    border-top: 1px solid #30363d;
-    padding: 8px 10px;
-    min-height: 108px;
-    max-height: 150px;
+    padding: 10px 12px;
     overflow-y: auto;
     font-size: 12px;
     line-height: 1.45;
@@ -179,14 +193,11 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     gap: 6px;
     padding: 8px 10px;
     border-top: 1px solid #30363d;
+    flex-wrap: wrap;
 }
-.trigger-editor { padding: 10px 12px; overflow-y: auto; }
-.trigger-field {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    margin-bottom: 8px;
-}
+.trigger-main-actions { border-bottom: 1px solid #30363d; }
+.trigger-editor { padding: 12px; overflow-y: auto; min-height: 0; }
+.trigger-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
 .trigger-field label { color: #8b949e; font-size: 11px; }
 .trigger-field input,
 .trigger-field textarea {
@@ -201,12 +212,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     outline: none;
 }
 .trigger-field textarea { min-height: 52px; resize: vertical; }
-.trigger-rule-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 72px 28px;
-    gap: 6px;
-    margin-bottom: 6px;
-}
+.trigger-rule-row { display: grid; grid-template-columns: 1fr 1fr 72px 28px; gap: 6px; margin-bottom: 6px; }
 .trigger-rule-row input { min-width: 0; }
 .trigger-small-btn {
     background: #21262d;
@@ -225,17 +231,13 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     min-height: 16px;
     color: #8b949e;
     font-size: 11px;
-    margin-top: 6px;
+    padding: 7px 10px;
+    border-top: 1px solid #30363d;
 }
 .trigger-status.error { color: #f85149; }
 .trigger-status.ok { color: #7ee787; }
-.trigger-tip {
-    color: #8b949e;
-    font-size: 11px;
-    line-height: 1.4;
-}
+.trigger-tip { color: #8b949e; font-size: 11px; line-height: 1.4; }
 
-/* 中间终端 */
 .terminal-panel {
     flex: 1;
     display: flex;
@@ -420,7 +422,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 </style>
 </head>
 <body>
-<div class="container">
+<div class="app-shell">
+    <div class="top-tabs">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-page="gamePage">游戏</button>
+            <button class="tab-btn" id="btnTriggers" data-page="triggerPage">触发器</button>
+        </div>
+        <div class="toolbar-trigger-current">当前触发器：<span id="toolbarTriggerCurrentName">无</span></div>
+        <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
+    </div>
+
+    <div class="page active" id="gamePage">
+        <div class="container">
     <div class="left-panel">
             <div class="settings-header">设置</div>
             <div class="settings-body" id="settingsPanel">
@@ -441,47 +454,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 <div id="mapTerminal"></div>
             </div>
     </div>
-    <div class="center-area">
-        <div class="toolbar">
-            <button class="toolbar-btn" id="btnTriggers">触发器</button>
-            <div class="toolbar-trigger-current">当前触发器：<span id="toolbarTriggerCurrentName">无</span></div>
-            <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
-            <div class="trigger-panel" id="triggerPanel">
-                <div class="trigger-current">当前加载：<span id="triggerCurrentName">无</span></div>
-                <div class="trigger-browser">
-                    <div class="trigger-list" id="triggerList">
-                        <div class="empty-hint">暂无触发器</div>
-                    </div>
-                    <div class="trigger-detail" id="triggerDetail">选择一个触发器查看详情</div>
-                    <div class="trigger-actions">
-                        <button class="trigger-small-btn primary" id="triggerLoadBtn" disabled>加载</button>
-                        <button class="trigger-small-btn danger" id="triggerDeleteBtn" disabled>删除</button>
-                    </div>
-                </div>
-                <div class="trigger-editor">
-                    <div class="trigger-field">
-                        <label for="triggerName">触发器名称</label>
-                        <input type="text" id="triggerName" placeholder="例如：读书恢复">
-                    </div>
-                    <div class="trigger-field">
-                        <label for="triggerNotes">备注</label>
-                        <textarea id="triggerNotes" placeholder="可写用途、地点或注意事项"></textarea>
-                    </div>
-                    <div class="trigger-field">
-                        <label>分支规则：服务器消息关键词 → 发送指令</label>
-                        <div class="trigger-tip">延时秒不填默认 0；不能填写负数。</div>
-                        <div id="triggerRules"></div>
-                    </div>
-                    <div class="trigger-actions">
-                        <button class="trigger-small-btn" id="triggerNewBtn">新建</button>
-                        <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
-                        <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
-                        <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
-                    </div>
-                    <div class="trigger-status" id="triggerStatus">未加载触发器</div>
-                </div>
-            </div>
-        </div>
+            <div class="center-area">
         <div class="terminal-panel">
             <div class="header">
                 <span class="status-dot" id="statusDot"></span>
@@ -509,6 +482,44 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             <div class="panel-header">聊天频道</div>
             <div class="panel-body" id="chatPanel">
                 <div class="empty-hint">等待聊天消息...</div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+
+    <div class="page" id="triggerPage">
+        <div class="trigger-panel" id="triggerPanel">
+            <div class="trigger-browser">
+                <div class="trigger-current">当前加载：<span id="triggerCurrentName">无</span></div>
+                <div class="trigger-detail" id="triggerDetail">选择一个触发器查看详情</div>
+                <div class="trigger-actions trigger-main-actions">
+                    <button class="trigger-small-btn primary" id="triggerLoadBtn" disabled>加载</button>
+                    <button class="trigger-small-btn danger" id="triggerDeleteBtn" disabled>删除</button>
+                    <button class="trigger-small-btn" id="triggerNewBtn">新建</button>
+                    <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
+                    <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
+                    <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
+                </div>
+                <div class="trigger-status" id="triggerStatus">未加载触发器</div>
+                <div class="trigger-list" id="triggerList">
+                    <div class="empty-hint">暂无触发器</div>
+                </div>
+            </div>
+            <div class="trigger-editor">
+                <div class="trigger-field">
+                    <label for="triggerName">触发器名称</label>
+                    <input type="text" id="triggerName" placeholder="例如：读书恢复">
+                </div>
+                <div class="trigger-field">
+                    <label for="triggerNotes">备注</label>
+                    <textarea id="triggerNotes" placeholder="可写用途、地点或注意事项"></textarea>
+                </div>
+                <div class="trigger-field">
+                    <label>分支规则：服务器消息关键词 → 发送指令</label>
+                    <div class="trigger-tip">延时秒不填默认 0；不能填写负数。</div>
+                    <div id="triggerRules"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -1491,10 +1502,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         if (msg.command) showSentCommand(msg.command);
     }
 
-    btnTriggers.addEventListener('click', function(e) {
-        e.stopPropagation();
-        triggerPanel.classList.toggle('open');
-        if (triggerPanel.classList.contains('open')) sendTriggerMessage('list');
+    document.querySelectorAll('.tab-btn[data-page]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const pageId = btn.getAttribute('data-page');
+            document.querySelectorAll('.tab-btn[data-page]').forEach(function(tab) {
+                tab.classList.toggle('active', tab === btn);
+            });
+            document.querySelectorAll('.page').forEach(function(page) {
+                page.classList.toggle('active', page.id === pageId);
+            });
+            if (pageId === 'triggerPage') sendTriggerMessage('list');
+            if (pageId === 'gamePage') setTimeout(function() { fitAddon.fit(); }, 0);
+        });
     });
 
     triggerListEl.addEventListener('click', function(e) {
@@ -1544,12 +1563,6 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     triggerStopBtn.addEventListener('click', function() {
         sendTriggerMessage('stop');
-    });
-
-    document.addEventListener('click', function(e) {
-        if (!triggerPanel.contains(e.target) && e.target !== btnTriggers) {
-            triggerPanel.classList.remove('open');
-        }
     });
 
     clearTriggerForm();
