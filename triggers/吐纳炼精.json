@@ -1,0 +1,31 @@
+{
+  "name": "吐纳炼精",
+  "notes": "",
+  "rules": [
+    {
+      "keyword": "你吐纳完毕，睁开双眼，站了起来。",
+      "command": "tuna 10",
+      "delay": 0
+    },
+    {
+      "keyword": "你现在精不足，无法修行精力！",
+      "command": "sleep",
+      "delay": 0
+    },
+    {
+      "keyword": "你刚刚睡过一觉",
+      "command": "sleep",
+      "delay": 5.0
+    },
+    {
+      "keyword": "你一觉醒来，精神抖擞地活动了几下手脚。",
+      "command": "tuna 10",
+      "delay": 0
+    },
+    {
+      "keyword": "一觉酣睡，万般烦忧皆付梦中，醒来只觉神清气爽",
+      "command": "tuna 10",
+      "delay": 0
+    }
+  ]
+}
