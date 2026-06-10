@@ -13,15 +13,19 @@
       "delay": 0
     },
     {
-      "keyword": "刚刚睡过还不能睡",
+      "keyword": "你刚刚睡过一觉",
       "command": "sleep",
-      "delay": 10
+      "delay": 5.0
     },
     {
       "keyword": "一觉酣睡，万般烦忧皆付梦中，醒来只觉神清气爽",
       "command": "w;s;w;w;xue lu for parry 10",
       "delay": 0
+    },
+    {
+      "keyword": "一觉醒来，精神抖擞地活动了几下手脚",
+      "command": "w;s;w;w;xue lu for parry 10",
+      "delay": 0
     }
   ]
 }
-
