@@ -1631,19 +1631,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         if (!item || !item.config) return;
         var copiedConfig = JSON.parse(JSON.stringify(item.config));
         copiedConfig.name = (copiedConfig.name || selectedTriggerId) + '_副本';
-        selectedTriggerId = '';
-        fillTriggerForm(copiedConfig);
-        triggerDetailEl.textContent = '正在新建触发器（复制自「' + (item.name || item.id) + '」）';
-        triggerDetailEl.classList.remove('flash');
-        void triggerDetailEl.offsetWidth;
-        triggerDetailEl.classList.add('flash');
-        triggerLoadBtn.disabled = true;
-        triggerDeleteBtn.disabled = true;
-        triggerCopyBtn.disabled = true;
-        triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
-            el.classList.remove('active');
-        });
-        setTriggerStatus('已复制，修改名称后保存即可', 'ok');
+        sendTriggerMessage('save', { id: '', config: copiedConfig });
     });
 
     triggerSaveBtn.addEventListener('click', function() {
