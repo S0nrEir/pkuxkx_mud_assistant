@@ -116,6 +116,33 @@
     </div>
 </div>
 
+<div class="fullme-panel" id="fullmePanel" aria-hidden="true">
+    <div class="fullme-card">
+        <div class="fullme-header">
+            <div>
+                <div class="fullme-title">工号 / 验证码</div>
+                <div class="fullme-source" id="fullmeSource">等待图片</div>
+            </div>
+            <button class="fullme-close" id="fullmeCloseBtn" type="button" title="关闭">×</button>
+        </div>
+        <div class="fullme-image-wrap">
+            <img id="fullmeImage" alt="工号验证码图片">
+        </div>
+        <div class="fullme-form">
+            <select id="fullmeCommandMode" title="发送命令类型">
+                <option value="report">report</option>
+                <option value="fullme">fullme</option>
+            </select>
+            <input type="text" id="fullmeInput" placeholder="手动输入看到的内容" autocomplete="off">
+            <button class="fullme-submit" id="fullmeSubmitBtn" type="button">发送</button>
+        </div>
+        <div class="fullme-actions">
+            <button class="fullme-secondary" id="fullmeCopyUrlBtn" type="button">复制链接</button>
+            <button class="fullme-secondary" id="fullmeOpenUrlBtn" type="button">浏览器打开</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>

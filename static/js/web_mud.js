@@ -57,6 +57,15 @@
     const sendBtn = document.getElementById('sendBtn');
     const scrollBottomBtn = document.getElementById('scrollBottomBtn');
     const btnTriggers = document.getElementById('btnTriggers');
+    const fullmePanel = document.getElementById('fullmePanel');
+    const fullmeImage = document.getElementById('fullmeImage');
+    const fullmeSource = document.getElementById('fullmeSource');
+    const fullmeInput = document.getElementById('fullmeInput');
+    const fullmeCommandMode = document.getElementById('fullmeCommandMode');
+    const fullmeSubmitBtn = document.getElementById('fullmeSubmitBtn');
+    const fullmeCloseBtn = document.getElementById('fullmeCloseBtn');
+    const fullmeCopyUrlBtn = document.getElementById('fullmeCopyUrlBtn');
+    const fullmeOpenUrlBtn = document.getElementById('fullmeOpenUrlBtn');
     const triggerPanel = document.getElementById('triggerPanel');
     const toolbarTriggerCurrentNameEl = document.getElementById('toolbarTriggerCurrentName');
     const triggerCurrentNameEl = document.getElementById('triggerCurrentName');
@@ -77,6 +86,9 @@
     let selectedTriggerId = '';
     let activeTriggerId = '';
     let chatInitialized = false;
+    let fullmePendingMode = 'report';
+    let fullmeCurrentUrl = '';
+    let fullmeCurrentImageUrl = '';
 
     function setStatus(connected) {
         statusDot.className = 'status-dot' + (connected ? ' connected' : '');
@@ -96,10 +108,72 @@
 
     function sendMudCommand(cmd) {
         if (!cmd.trim() || !ws || ws.readyState !== WebSocket.OPEN) return false;
+        const cleanCmd = cmd.trim();
+        if (/^fullme(?:\s|$)/i.test(cleanCmd)) {
+            fullmePendingMode = 'fullme';
+        } else if (/^ask\s+.+\s+about\s+(?:job|工作)/i.test(cleanCmd)) {
+            fullmePendingMode = 'report';
+        }
         showSentCommand(cmd);
         ws.send(cmd + '\r');
-        ws.send(JSON.stringify({ type: 'command', data: cmd.trim() }));
+        ws.send(JSON.stringify({ type: 'command', data: cleanCmd }));
         return true;
+    }
+
+    function updateFullmeModeFromText(text) {
+        const clean = sanitizeTerminalText(text);
+        if (/fullme\s+验证码|请输入你看到的图片上的内容/.test(clean)) {
+            fullmePendingMode = 'fullme';
+            return;
+        }
+        if (/记住你的工号|report\s+口令|报上你的口令/.test(clean)) {
+            fullmePendingMode = 'report';
+        }
+    }
+
+    function imageUrlFromFullmeUrl(url) {
+        const value = String(url || '').replace(/&amp;/g, '&');
+        if (!value) return '';
+        if (/\/zmud\/[^/?#]+\.jpg/i.test(value)) return value;
+        const match = value.match(/[?&]filename=([^&#]+)/i);
+        if (match) {
+            return 'http://fullme.pkuxkx.net/zmud/' + encodeURIComponent(decodeURIComponent(match[1])) + '.jpg';
+        }
+        return value;
+    }
+
+    function showFullmePanel(url, imageUrl, mode) {
+        const sourceUrl = String(url || imageUrl || '').replace(/&amp;/g, '&');
+        const resolvedImageUrl = imageUrlFromFullmeUrl(imageUrl || sourceUrl);
+        if (!resolvedImageUrl) return;
+
+        fullmeCurrentUrl = sourceUrl || resolvedImageUrl;
+        fullmeCurrentImageUrl = resolvedImageUrl;
+        fullmeImage.src = resolvedImageUrl;
+        fullmeSource.textContent = fullmeCurrentUrl;
+        fullmeCommandMode.value = mode || fullmePendingMode || 'report';
+        fullmeInput.value = '';
+        fullmePanel.classList.add('visible');
+        fullmePanel.setAttribute('aria-hidden', 'false');
+        setTimeout(function() { fullmeInput.focus(); }, 0);
+    }
+
+    function inspectFullmeText(text) {
+        updateFullmeModeFromText(text);
+
+        const imgMatch = String(text).match(/<img\b[^>]*\bsrc=(?:"([^"]+)"|'([^']+)'|(\S+))[^>]*>/i);
+        if (imgMatch) {
+            const imgUrl = imgMatch[1] || imgMatch[2] || imgMatch[3] || '';
+            if (/fullme\.pkuxkx\.net/i.test(imgUrl)) {
+                showFullmePanel(imgUrl, imgUrl, fullmePendingMode);
+                return;
+            }
+        }
+
+        const urlMatch = String(text).match(/https?:\/\/fullme\.pkuxkx\.net\/[^\s<>"']+/i);
+        if (urlMatch) {
+            showFullmePanel(urlMatch[0], imageUrlFromFullmeUrl(urlMatch[0]), fullmePendingMode);
+        }
     }
 
     function connect() {
@@ -119,6 +193,7 @@
             if (event.data instanceof ArrayBuffer) {
                 // 终端数据 (UTF-8 文本 + ANSI + MXP 标签)
                 const text = new TextDecoder('utf-8').decode(event.data);
+                inspectFullmeText(text);
                 const processed = processMXP(text);
                 term.write(processed);
             } else {
@@ -542,6 +617,21 @@
                 i = skipOpenTag(text, i); continue;
             }
 
+            // <IMG src="..."> → fullme 图片显示，其他图片忽略
+            if (text[i] === '<' && isTagWithAttrs(text, i, 'IMG')) {
+                const gtIdx = text.indexOf('>', i);
+                if (gtIdx !== -1) {
+                    const attrStr = text.substring(i + 4, gtIdx).trim();
+                    const attrs = parseMxpAttrs(attrStr);
+                    const imgUrl = attrs.src || attrs._pos0 || '';
+                    if (/fullme\.pkuxkx\.net/i.test(imgUrl)) {
+                        showFullmePanel(imgUrl, imgUrl, fullmePendingMode);
+                    }
+                    i = gtIdx + 1;
+                    continue;
+                }
+            }
+
             // <FRAME ...> <DEST ...> <IMAGE ...> <SOUND ...> <MUSIC ...> → 忽略
             if (text[i] === '<' && (isTagWithAttrs(text, i, 'FRAME') || isTagWithAttrs(text, i, 'DEST') || isTagWithAttrs(text, i, 'IMAGE') || isTagWithAttrs(text, i, 'SOUND') || isTagWithAttrs(text, i, 'MUSIC'))) {
                 i = skipOpenTag(text, i); continue;
@@ -730,6 +820,48 @@
         // 自动滚动到底部
         chatPanelEl.scrollTop = chatPanelEl.scrollHeight;
     }
+
+    // ─── fullme 工号 / 验证码面板 ───
+    function hideFullmePanel() {
+        fullmePanel.classList.remove('visible');
+        fullmePanel.setAttribute('aria-hidden', 'true');
+        fullmeInput.value = '';
+    }
+
+    function submitFullmeCode() {
+        const code = fullmeInput.value.trim();
+        if (!code) {
+            fullmeInput.focus();
+            return;
+        }
+        const mode = fullmeCommandMode.value === 'fullme' ? 'fullme' : 'report';
+        if (sendMudCommand(mode + ' ' + code)) {
+            hideFullmePanel();
+        }
+    }
+
+    fullmeCloseBtn.addEventListener('click', hideFullmePanel);
+    fullmeSubmitBtn.addEventListener('click', submitFullmeCode);
+    fullmeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitFullmeCode();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideFullmePanel();
+        }
+    });
+    fullmeCopyUrlBtn.addEventListener('click', function() {
+        const url = fullmeCurrentUrl || fullmeCurrentImageUrl;
+        if (!url) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).catch(function() {});
+        }
+    });
+    fullmeOpenUrlBtn.addEventListener('click', function() {
+        const url = fullmeCurrentUrl || fullmeCurrentImageUrl;
+        if (url) window.open(url, '_blank', 'noopener');
+    });
 
     // ─── 工具函数 ───
     function escapeHtml(s) {
