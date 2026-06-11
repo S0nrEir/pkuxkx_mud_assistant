@@ -20,21 +20,23 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     padding: 0 12px;
     flex-shrink: 0;
 }
-.tab-buttons { display: flex; gap: 4px; }
+.tab-buttons { display: flex; gap: 0; }
 .tab-btn {
     background: transparent;
     color: #8b949e;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    padding: 5px 14px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 0 16px;
+    height: 38px;
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
-    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
-.tab-btn:hover { color: #c9d1d9; background: #21262d; }
-.tab-btn.active { color: #fff; background: #238636; border-color: #2ea043; }
-.tab-btn:active { transform: translateY(1px) scale(0.98); }
+.tab-btn:hover { color: #c9d1d9; }
+.tab-btn.active { color: #fff; border-bottom-color: #2ea043; }
+.tab-btn:active { opacity: 0.8; }
 .tab-btn.tab-hit { animation: softFlash 0.32s ease-out; }
 .top-tabs .toolbar-trigger-current { flex: 1; }
 .page { flex: 1; min-height: 0; display: none; }
