@@ -543,6 +543,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
                 <div class="trigger-actions trigger-main-actions">
                     <button class="trigger-small-btn primary" id="triggerLoadBtn" disabled>加载</button>
                     <button class="trigger-small-btn" id="triggerNewBtn">新建</button>
+                    <button class="trigger-small-btn" id="triggerCopyBtn" disabled>复制</button>
                     <button class="trigger-small-btn" id="triggerAddRuleBtn">添加分支</button>
                     <button class="trigger-small-btn primary" id="triggerSaveBtn">保存</button>
                     <button class="trigger-small-btn" id="triggerStopBtn">停用</button>
@@ -649,6 +650,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     const triggerNotesEl = document.getElementById('triggerNotes');
     const triggerRulesEl = document.getElementById('triggerRules');
     const triggerNewBtn = document.getElementById('triggerNewBtn');
+    const triggerCopyBtn = document.getElementById('triggerCopyBtn');
     const triggerAddRuleBtn = document.getElementById('triggerAddRuleBtn');
     const triggerSaveBtn = document.getElementById('triggerSaveBtn');
     const triggerStopBtn = document.getElementById('triggerStopBtn');
@@ -1402,6 +1404,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         triggerDetailEl.classList.add('flash');
         triggerLoadBtn.disabled = true;
         triggerDeleteBtn.disabled = true;
+        triggerCopyBtn.disabled = true;
         triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
             el.classList.remove('active');
         });
@@ -1485,6 +1488,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
             triggerDetailEl.textContent = '选择一个触发器查看详情';
             triggerLoadBtn.disabled = true;
             triggerDeleteBtn.disabled = true;
+            triggerCopyBtn.disabled = true;
             selectedTriggerId = '';
             return;
         }
@@ -1515,6 +1519,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
         if (item && item.config) fillTriggerForm(item.config);
         triggerDeleteBtn.disabled = !item;
         triggerLoadBtn.disabled = !item || (selectedTriggerId === activeTriggerId);
+        triggerCopyBtn.disabled = !item;
         triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
             var elId = el.getAttribute('data-id');
             el.classList.toggle('active', elId === selectedTriggerId);
@@ -1618,6 +1623,27 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 
     triggerNewBtn.addEventListener('click', function() {
         startNewTrigger();
+    });
+
+    triggerCopyBtn.addEventListener('click', function() {
+        if (!selectedTriggerId) return;
+        var item = triggerItems.find(function(x) { return x.id === selectedTriggerId; });
+        if (!item || !item.config) return;
+        var copiedConfig = JSON.parse(JSON.stringify(item.config));
+        copiedConfig.name = (copiedConfig.name || selectedTriggerId) + '_副本';
+        selectedTriggerId = '';
+        fillTriggerForm(copiedConfig);
+        triggerDetailEl.textContent = '正在新建触发器（复制自「' + (item.name || item.id) + '」）';
+        triggerDetailEl.classList.remove('flash');
+        void triggerDetailEl.offsetWidth;
+        triggerDetailEl.classList.add('flash');
+        triggerLoadBtn.disabled = true;
+        triggerDeleteBtn.disabled = true;
+        triggerCopyBtn.disabled = true;
+        triggerListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        setTriggerStatus('已复制，修改名称后保存即可', 'ok');
     });
 
     triggerSaveBtn.addEventListener('click', function() {
