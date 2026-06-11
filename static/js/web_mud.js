@@ -64,6 +64,7 @@
     const fullmeCommandMode = document.getElementById('fullmeCommandMode');
     const fullmeSubmitBtn = document.getElementById('fullmeSubmitBtn');
     const fullmeCloseBtn = document.getElementById('fullmeCloseBtn');
+    const fullmeRefreshBtn = document.getElementById('fullmeRefreshBtn');
     const fullmeCopyUrlBtn = document.getElementById('fullmeCopyUrlBtn');
     const fullmeOpenUrlBtn = document.getElementById('fullmeOpenUrlBtn');
     const triggerPanel = document.getElementById('triggerPanel');
@@ -840,8 +841,15 @@
         }
     }
 
+    function refreshFullmeImage() {
+        const mode = fullmeCommandMode.value === 'fullme' ? 'fullme' : 'report';
+        const command = mode === 'fullme' ? 'fullme' : 'ask yunyou sengren about 口令';
+        sendMudCommand(command);
+    }
+
     fullmeCloseBtn.addEventListener('click', hideFullmePanel);
     fullmeSubmitBtn.addEventListener('click', submitFullmeCode);
+    fullmeRefreshBtn.addEventListener('click', refreshFullmeImage);
     fullmeInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
