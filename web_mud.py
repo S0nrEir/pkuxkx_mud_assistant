@@ -9,6 +9,7 @@ import config
 from mud_session import MudSession
 
 HTML_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'templates', 'web_mud.html')
+STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 
 def load_html_page():
@@ -19,6 +20,7 @@ def load_html_page():
 from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
 from starlette.responses import HTMLResponse
+from starlette.staticfiles import StaticFiles
 
 
 async def index_page(request):
@@ -39,6 +41,7 @@ routes = [
 ]
 
 app = Starlette(routes=routes)
+app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
 
 
 # ═══════════════════════════════════════════
