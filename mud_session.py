@@ -66,6 +66,7 @@ class MudSession:
         self._trigger_waiting_chunk = 0
         self._trigger_generation = 0
         self._mud_chunk_seq = 0
+        self._raw_log_file = None   # 原始字节日志文件句柄
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -99,6 +100,12 @@ class MudSession:
     async def cleanup(self):
         self.running = False
         self._cancel_trigger_tasks()
+        if self._raw_log_file:
+            try:
+                self._raw_log_file.close()
+            except Exception:
+                pass
+            self._raw_log_file = None
         if self.writer:
             try:
                 self.writer.close()
@@ -369,6 +376,9 @@ class MudSession:
             except (ConnectionResetError, OSError):
                 break
 
+            # 0. 记录原始字节（完全未经处理，含 Telnet IAC）
+            self._log_raw_bytes(data, 'recv')
+
             # 1. 剥离 Telnet IAC 并回应协商
             clean = await strip_iac_and_respond(data, self.writer)
             self._mud_chunk_seq += 1
@@ -523,6 +533,7 @@ class MudSession:
             if msg.get('bytes'):
                 # 二进制数据 → 原始转发
                 data = bytes(msg['bytes'])
+                self._log_raw_bytes(data, 'send')
                 self.writer.write(data)
                 await self.writer.drain()
                 # 尝试解码用于日志
@@ -546,7 +557,9 @@ class MudSession:
                     elif j.get('type') == 'mxp_reply':
                         reply = j.get('data', '')
                         if reply:
-                            self.writer.write(reply.encode('gbk', errors='replace'))
+                            raw = reply.encode('gbk', errors='replace')
+                            self._log_raw_bytes(raw, 'send')
+                            self.writer.write(raw)
                             await self.writer.drain()
                     elif j.get('type') == 'mute_channels':
                         self.muted_channels = set(j.get('data', []))
@@ -567,6 +580,7 @@ class MudSession:
             except Exception:
                 data = text_data.encode('utf-8', errors='replace')
 
+            self._log_raw_bytes(data, 'send')
             self.writer.write(data)
             await self.writer.drain()
             self._log_data(text_data, 'send')
@@ -599,6 +613,39 @@ class MudSession:
         asyncio.create_task(_send())
 
     # ─── 日志 ───
+    def _open_raw_log(self):
+        """打开当天的原始字节日志文件（追加模式）"""
+        if self._raw_log_file:
+            return
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        log_path = os.path.join(self.log_dir, f'{date_str}_raw.bin')
+        try:
+            self._raw_log_file = open(log_path, 'ab')
+        except Exception:
+            self._raw_log_file = None
+
+    def _log_raw_bytes(self, data, direction):
+        """记录原始字节到 .bin 日志（未经任何转码、剥离、解码处理）
+
+        格式：每条消息一行，[HH:MM:SS.mmm] >>>/<<< 后跟原始字节，以 \\n 结尾。
+        注意：如果原始数据本身含 \\n，解析时需按时间戳行首分割。
+        """
+        if not data:
+            return
+        if not self._raw_log_file:
+            self._open_raw_log()
+        if not self._raw_log_file:
+            return
+        marker = b'>>>' if direction == 'send' else b'<<<'
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:12].encode('ascii')
+        try:
+            self._raw_log_file.write(b'[' + timestamp + b'] ' + marker + b' ')
+            self._raw_log_file.write(data)
+            self._raw_log_file.write(b'\n')
+            self._raw_log_file.flush()
+        except Exception:
+            pass
+
     def _log_data(self, text, direction):
         """记录日志（与 proxy.py 格式一致）"""
         timestamp = datetime.now().strftime('%H:%M:%S')
