@@ -59,6 +59,7 @@
     const btnTriggers = document.getElementById('btnTriggers');
     const fullmePanel = document.getElementById('fullmePanel');
     const fullmeImage = document.getElementById('fullmeImage');
+    const fullmeFrame = document.getElementById('fullmeFrame');
     const fullmeSource = document.getElementById('fullmeSource');
     const fullmeInput = document.getElementById('fullmeInput');
     const fullmeCommandMode = document.getElementById('fullmeCommandMode');
@@ -112,7 +113,7 @@
         const cleanCmd = cmd.trim();
         if (/^fullme(?:\s|$)/i.test(cleanCmd)) {
             fullmePendingMode = 'fullme';
-        } else if (/^ask\s+.+\s+about\s+(?:job|工作)/i.test(cleanCmd)) {
+        } else if (/^(?:report|reprot)(?:\s|$)/i.test(cleanCmd) || /^ask\s+.+\s+about\s+(?:job|工作|口令)/i.test(cleanCmd)) {
             fullmePendingMode = 'report';
         }
         showSentCommand(cmd);
@@ -132,32 +133,86 @@
         }
     }
 
+    function isFullmeUrl(url) {
+        try {
+            const host = new URL(String(url || '').replace(/&amp;/g, '&'), location.href).hostname.toLowerCase();
+            return host === 'fullme.pkuxkx.net'
+                || host === 'fullme.pkuxkx.com'
+                || (host.startsWith('fullme.') && host.endsWith('.pkuxkx.com'))
+                || host.endsWith('.fullme.pkuxkx.com');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function proxyFullmeUrl(url) {
+        return '/fullme-proxy?url=' + encodeURIComponent(String(url || '').replace(/&amp;/g, '&'));
+    }
+
+    function pageUrlFromFullmeUrl(url) {
+        const value = String(url || '').replace(/&amp;/g, '&');
+        if (!value) return '';
+        try {
+            const parsed = new URL(value, location.href);
+            if (!isFullmeUrl(parsed.href)) return value;
+            const jpgMatch = parsed.pathname.match(/\/zmud\/([^/?#]+)\.jpg$/i);
+            if (jpgMatch) {
+                parsed.pathname = '/robot.php';
+                parsed.search = '?filename=' + encodeURIComponent(decodeURIComponent(jpgMatch[1]));
+                parsed.hash = '';
+                return parsed.href;
+            }
+            return parsed.href;
+        } catch (e) {
+            return value;
+        }
+    }
+
     function imageUrlFromFullmeUrl(url) {
         const value = String(url || '').replace(/&amp;/g, '&');
         if (!value) return '';
-        if (/\/zmud\/[^/?#]+\.jpg/i.test(value)) return value;
-        const match = value.match(/[?&]filename=([^&#]+)/i);
-        if (match) {
-            return 'http://fullme.pkuxkx.net/zmud/' + encodeURIComponent(decodeURIComponent(match[1])) + '.jpg';
+        try {
+            const parsed = new URL(value, location.href);
+            if (/\/zmud\/[^/?#]+\.jpg$/i.test(parsed.pathname)) return parsed.href;
+            const match = parsed.search.match(/[?&]filename=([^&#]+)/i);
+            if (match && isFullmeUrl(parsed.href)) {
+                parsed.pathname = '/zmud/' + encodeURIComponent(decodeURIComponent(match[1])) + '.jpg';
+                parsed.search = '';
+                parsed.hash = '';
+                return parsed.href;
+            }
+            return parsed.href;
+        } catch (e) {
+            return value;
         }
-        return value;
     }
 
     function showFullmePanel(url, imageUrl, mode) {
         const sourceUrl = String(url || imageUrl || '').replace(/&amp;/g, '&');
         const resolvedImageUrl = imageUrlFromFullmeUrl(imageUrl || sourceUrl);
-        if (!resolvedImageUrl) return;
+        const pageUrl = pageUrlFromFullmeUrl(sourceUrl || resolvedImageUrl);
+        if (!resolvedImageUrl && !pageUrl) return;
 
-        fullmeCurrentUrl = sourceUrl || resolvedImageUrl;
+        fullmeCurrentUrl = pageUrl || sourceUrl || resolvedImageUrl;
         fullmeCurrentImageUrl = resolvedImageUrl;
-        fullmeImage.src = resolvedImageUrl;
         fullmeSource.textContent = fullmeCurrentUrl;
         fullmeCommandMode.value = mode || fullmePendingMode || 'report';
         fullmeInput.value = '';
+        fullmeFrame.hidden = true;
+        fullmeFrame.removeAttribute('src');
+        fullmeImage.hidden = false;
+        fullmeImage.src = isFullmeUrl(resolvedImageUrl) ? proxyFullmeUrl(resolvedImageUrl) : resolvedImageUrl;
         fullmePanel.classList.add('visible');
         fullmePanel.setAttribute('aria-hidden', 'false');
         setTimeout(function() { fullmeInput.focus(); }, 0);
     }
+
+    fullmeImage.addEventListener('error', function() {
+        if (!fullmeCurrentUrl || !isFullmeUrl(fullmeCurrentUrl)) return;
+        fullmeImage.hidden = true;
+        fullmeFrame.hidden = false;
+        fullmeFrame.src = proxyFullmeUrl(fullmeCurrentUrl);
+    });
 
     function inspectFullmeText(text) {
         updateFullmeModeFromText(text);
@@ -165,13 +220,13 @@
         const imgMatch = String(text).match(/<img\b[^>]*\bsrc=(?:"([^"]+)"|'([^']+)'|(\S+))[^>]*>/i);
         if (imgMatch) {
             const imgUrl = imgMatch[1] || imgMatch[2] || imgMatch[3] || '';
-            if (/fullme\.pkuxkx\.net/i.test(imgUrl)) {
+            if (isFullmeUrl(imgUrl)) {
                 showFullmePanel(imgUrl, imgUrl, fullmePendingMode);
                 return;
             }
         }
 
-        const urlMatch = String(text).match(/https?:\/\/fullme\.pkuxkx\.net\/[^\s<>"']+/i);
+        const urlMatch = String(text).match(/https?:\/\/(?:fullme\.pkuxkx\.net|fullme\.pkuxkx\.com|fullme\.[a-z0-9-]+\.pkuxkx\.com|[a-z0-9-]+\.fullme\.pkuxkx\.com)\/[^\s<>"']+/i);
         if (urlMatch) {
             showFullmePanel(urlMatch[0], imageUrlFromFullmeUrl(urlMatch[0]), fullmePendingMode);
         }
@@ -625,7 +680,7 @@
                     const attrStr = text.substring(i + 4, gtIdx).trim();
                     const attrs = parseMxpAttrs(attrStr);
                     const imgUrl = attrs.src || attrs._pos0 || '';
-                    if (/fullme\.pkuxkx\.net/i.test(imgUrl)) {
+                    if (isFullmeUrl(imgUrl)) {
                         showFullmePanel(imgUrl, imgUrl, fullmePendingMode);
                     }
                     i = gtIdx + 1;

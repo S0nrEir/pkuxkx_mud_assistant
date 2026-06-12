@@ -522,6 +522,12 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     max-height: 180px;
     object-fit: contain;
 }
+.fullme-image-wrap iframe {
+    width: 100%;
+    min-height: 180px;
+    border: 0;
+    background: #fff;
+}
 .fullme-form {
     display: grid;
     grid-template-columns: 88px 1fr 68px;
