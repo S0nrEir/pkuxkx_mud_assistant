@@ -9,6 +9,11 @@ from datetime import datetime
 import config
 from chat_monitor import is_chat_message
 from mud_telnet import gbk_safe_split, strip_iac_and_respond
+from quick_commands import (
+    delete_config as delete_quick_command_config,
+    list_configs as list_quick_command_configs,
+    save_config as save_quick_command_config,
+)
 from triggers import TriggerRuntime, delete_config, list_configs, load_config, save_config
 
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07')
@@ -120,17 +125,18 @@ class MudSession:
         except Exception:
             pass
 
-    async def _send_mud_command(self, command):
+    async def _send_mud_command(self, command, event_type='trigger_event', track_trigger=True):
         command = str(command or '').strip()
         if not command or not self.writer:
             return
         self.writer.write((command + '\r\n').encode('gbk', errors='replace'))
         await self.writer.drain()
-        self._trigger_response_parts = []
-        self._trigger_waiting_chunk = self._mud_chunk_seq
+        if track_trigger:
+            self._trigger_response_parts = []
+            self._trigger_waiting_chunk = self._mud_chunk_seq
         self._log_data(command, 'send')
         await self._send_ws_json({
-            'type': 'trigger_event',
+            'type': event_type,
             'command': command,
             'active': self.triggers.active,
         })
@@ -227,6 +233,75 @@ class MudSession:
         if status:
             payload['status'] = status
         await self._send_ws_json(payload)
+
+    async def _send_quick_command_list(self, status=''):
+        payload = {
+            'type': 'quick_command_list',
+            'items': list_quick_command_configs(),
+        }
+        if status:
+            payload['status'] = status
+        await self._send_ws_json(payload)
+
+    async def _handle_quick_command_ws(self, msg):
+        action = msg.get('action')
+        if action == 'list':
+            await self._send_quick_command_list()
+            return
+
+        if action == 'save':
+            try:
+                command_id, config_data = save_quick_command_config(
+                    msg.get('config') or {},
+                    msg.get('id') or '',
+                )
+            except ValueError as e:
+                await self._send_ws_json({
+                    'type': 'quick_command_status',
+                    'ok': False,
+                    'status': f'保存失败：{e}',
+                })
+                return
+            await self._send_ws_json({
+                'type': 'quick_command_status',
+                'ok': True,
+                'status': '已保存快捷命令',
+                'id': command_id,
+                'config': config_data,
+            })
+            await self._send_quick_command_list()
+            return
+
+        if action == 'delete':
+            delete_quick_command_config(msg.get('id') or '')
+            await self._send_quick_command_list('已删除快捷命令')
+            return
+
+        if action == 'execute':
+            config_data = msg.get('config') or {}
+            commands = config_data.get('commands') if isinstance(config_data, dict) else []
+            sent = 0
+            for step in commands if isinstance(commands, list) else []:
+                if not isinstance(step, dict):
+                    continue
+                command = str(step.get('command') or '').strip()
+                if not command:
+                    continue
+                try:
+                    delay = float(step.get('delay') or 0)
+                except (TypeError, ValueError):
+                    delay = 0
+                delay = max(0, min(delay, 3600))
+                if delay:
+                    await asyncio.sleep(delay)
+                await self._send_mud_command(command, event_type='quick_command_event', track_trigger=False)
+                self._add_history(command)
+                sent += 1
+            await self._send_ws_json({
+                'type': 'quick_command_status',
+                'ok': sent > 0,
+                'status': f'已发送 {sent} 条指令' if sent else '没有可发送的指令',
+            })
 
     async def _handle_trigger_ws(self, msg):
         action = msg.get('action')
@@ -565,6 +640,8 @@ class MudSession:
                         self.muted_channels = set(j.get('data', []))
                     elif j.get('type') == 'trigger':
                         await self._handle_trigger_ws(j)
+                    elif j.get('type') == 'quick_command':
+                        await self._handle_quick_command_ws(j)
                     elif j.get('type') == 'quit_game':
                         self._quit_pending = True
                         self.writer.write(b'save\r\n')

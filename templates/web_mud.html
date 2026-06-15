@@ -14,6 +14,7 @@
         <div class="tab-buttons">
             <button class="tab-btn active" data-page="gamePage">游戏</button>
             <button class="tab-btn" id="btnTriggers" data-page="triggerPage">触发器</button>
+            <button class="tab-btn" id="btnQuickCommands" data-page="quickCommandPage">快捷命令</button>
         </div>
         <div class="toolbar-trigger-current">当前触发器：<span id="toolbarTriggerCurrentName">无</span></div>
         <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
@@ -37,8 +38,19 @@
             </div>
             <div class="settings-footer">屏蔽后终端不显示，聊天面板始终显示</div>
             <div class="map-panel">
-                <div class="panel-label" id="mapLabel">地图</div>
-                <div id="mapTerminal"></div>
+                <div class="left-tabs">
+                    <button class="left-tab-btn active" data-left-page="mapPane" type="button" id="mapTabBtn">地图</button>
+                    <button class="left-tab-btn" data-left-page="quickPane" type="button" id="quickCommandTabBtn">快捷命令</button>
+                </div>
+                <div class="left-pane active" id="mapPane">
+                    <div class="panel-label" id="mapLabel">地图</div>
+                    <div id="mapTerminal"></div>
+                </div>
+                <div class="left-pane" id="quickPane">
+                    <div class="quick-command-buttons" id="quickCommandButtons">
+                        <div class="empty-hint">暂无快捷命令</div>
+                    </div>
+                </div>
             </div>
     </div>
             <div class="center-area">
@@ -110,6 +122,45 @@
                 <div class="trigger-current">所有触发器</div>
                 <div class="trigger-list" id="triggerList">
                     <div class="empty-hint">暂无触发器</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page" id="quickCommandPage">
+        <div class="trigger-panel" id="quickCommandPanel">
+            <div class="trigger-main">
+                <div class="trigger-current">快捷命令：<span id="quickCommandCurrentName">未选择</span></div>
+                <div class="trigger-detail" id="quickCommandDetail">选择一个快捷命令查看详情</div>
+                <div class="trigger-actions trigger-main-actions">
+                    <button class="trigger-small-btn primary" id="quickCommandRunBtn" disabled>执行</button>
+                    <button class="trigger-small-btn" id="quickCommandNewBtn">新建</button>
+                    <button class="trigger-small-btn" id="quickCommandCopyBtn" disabled>复制</button>
+                    <button class="trigger-small-btn" id="quickCommandAddStepBtn">添加指令</button>
+                    <button class="trigger-small-btn primary" id="quickCommandSaveBtn">保存</button>
+                    <button class="trigger-small-btn danger" id="quickCommandDeleteBtn" disabled>删除</button>
+                </div>
+                <div class="trigger-status" id="quickCommandStatus">未加载快捷命令</div>
+                <div class="trigger-editor">
+                    <div class="trigger-field">
+                        <label for="quickCommandName">快捷命令名称</label>
+                        <input type="text" id="quickCommandName" placeholder="例如：回家补给">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="quickCommandNotes">备注</label>
+                        <textarea id="quickCommandNotes" placeholder="可写用途、地点或注意事项"></textarea>
+                    </div>
+                    <div class="trigger-field">
+                        <label>执行指令</label>
+                        <div class="trigger-tip">每行一条指令；延时秒不填默认 0。</div>
+                        <div id="quickCommandSteps"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="trigger-browser">
+                <div class="trigger-current">所有快捷命令</div>
+                <div class="trigger-list" id="quickCommandList">
+                    <div class="empty-hint">暂无快捷命令</div>
                 </div>
             </div>
         </div>

@@ -84,9 +84,25 @@
     const triggerSaveBtn = document.getElementById('triggerSaveBtn');
     const triggerStopBtn = document.getElementById('triggerStopBtn');
     const triggerStatusEl = document.getElementById('triggerStatus');
+    const quickCommandButtonsEl = document.getElementById('quickCommandButtons');
+    const quickCommandCurrentNameEl = document.getElementById('quickCommandCurrentName');
+    const quickCommandDetailEl = document.getElementById('quickCommandDetail');
+    const quickCommandListEl = document.getElementById('quickCommandList');
+    const quickCommandRunBtn = document.getElementById('quickCommandRunBtn');
+    const quickCommandNewBtn = document.getElementById('quickCommandNewBtn');
+    const quickCommandCopyBtn = document.getElementById('quickCommandCopyBtn');
+    const quickCommandAddStepBtn = document.getElementById('quickCommandAddStepBtn');
+    const quickCommandSaveBtn = document.getElementById('quickCommandSaveBtn');
+    const quickCommandDeleteBtn = document.getElementById('quickCommandDeleteBtn');
+    const quickCommandStatusEl = document.getElementById('quickCommandStatus');
+    const quickCommandNameEl = document.getElementById('quickCommandName');
+    const quickCommandNotesEl = document.getElementById('quickCommandNotes');
+    const quickCommandStepsEl = document.getElementById('quickCommandSteps');
     let triggerItems = [];
     let selectedTriggerId = '';
     let activeTriggerId = '';
+    let quickCommandItems = [];
+    let selectedQuickCommandId = '';
     let chatInitialized = false;
     let fullmePendingMode = 'report';
     let fullmeCurrentUrl = '';
@@ -255,6 +271,7 @@
             cmdInput.focus();
             syncMutedToBackend();
             sendTriggerMessage('list');
+            sendQuickCommandMessage('list');
         };
 
         ws.onmessage = function(event) {
@@ -278,6 +295,12 @@
                         handleTriggerStatus(msg);
                     } else if (msg.type === 'trigger_event') {
                         handleTriggerEvent(msg);
+                    } else if (msg.type === 'quick_command_list') {
+                        handleQuickCommandList(msg);
+                    } else if (msg.type === 'quick_command_status') {
+                        handleQuickCommandStatus(msg);
+                    } else if (msg.type === 'quick_command_event') {
+                        handleQuickCommandEvent(msg);
                     } else if (msg.type === 'map') {
                         // 地图数据 → 渲染到地图面板（垂直居中）
                         mapTerm.clear();
@@ -1019,6 +1042,22 @@
         ws.send(JSON.stringify(Object.assign({ type: 'trigger', action: action }, data || {})));
     }
 
+    function setQuickCommandStatus(text, kind) {
+        quickCommandStatusEl.textContent = text || '';
+        quickCommandStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
+        quickCommandStatusEl.classList.remove('flash');
+        void quickCommandStatusEl.offsetWidth;
+        quickCommandStatusEl.classList.add('flash');
+    }
+
+    function sendQuickCommandMessage(action, data) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            setQuickCommandStatus('未连接，无法操作', 'error');
+            return;
+        }
+        ws.send(JSON.stringify(Object.assign({ type: 'quick_command', action: action }, data || {})));
+    }
+
     function addTriggerRule(keyword, command, delay) {
         const row = document.createElement('div');
         row.className = 'trigger-rule-row';
@@ -1212,6 +1251,172 @@
         if (msg.command) showSentCommand(msg.command);
     }
 
+    function addQuickCommandStep(command, delay) {
+        const row = document.createElement('div');
+        row.className = 'quick-command-step-row';
+        row.innerHTML =
+            '<input type="text" class="quick-command-step-command" placeholder="发送指令" value="' + escapeAttr(command || '') + '">' +
+            '<input type="number" class="quick-command-step-delay" placeholder="延时秒" min="0" max="3600" step="0.1" value="' + escapeAttr(delay || '') + '">' +
+            '<button class="trigger-small-btn danger quick-command-step-delete" type="button">×</button>';
+        quickCommandStepsEl.appendChild(row);
+    }
+
+    function clearQuickCommandForm() {
+        quickCommandNameEl.value = '';
+        quickCommandNotesEl.value = '';
+        quickCommandStepsEl.innerHTML = '';
+        addQuickCommandStep('', '');
+        quickCommandCurrentNameEl.textContent = '未选择';
+    }
+
+    function startNewQuickCommand() {
+        selectedQuickCommandId = '';
+        clearQuickCommandForm();
+        quickCommandDetailEl.textContent = '正在新建快捷命令';
+        quickCommandRunBtn.disabled = true;
+        quickCommandDeleteBtn.disabled = true;
+        quickCommandCopyBtn.disabled = true;
+        quickCommandListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        setQuickCommandStatus('正在新建快捷命令', 'ok');
+    }
+
+    function fillQuickCommandForm(config) {
+        config = config || {};
+        quickCommandNameEl.value = config.name || '';
+        quickCommandNotesEl.value = config.notes || '';
+        quickCommandStepsEl.innerHTML = '';
+        const commands = config.commands || [];
+        if (!commands.length) addQuickCommandStep('', '');
+        commands.forEach(function(step) {
+            addQuickCommandStep(step.command, step.delay || '');
+        });
+    }
+
+    function getQuickCommandFormConfig() {
+        const commands = [];
+        let hasNegativeDelay = false;
+        quickCommandStepsEl.querySelectorAll('.quick-command-step-row').forEach(function(row) {
+            const command = row.querySelector('.quick-command-step-command').value.trim();
+            const delayRaw = row.querySelector('.quick-command-step-delay').value.trim();
+            let delay = parseFloat(delayRaw);
+            if (Number.isFinite(delay) && delay < 0) {
+                hasNegativeDelay = true;
+                row.querySelector('.quick-command-step-delay').focus();
+                return;
+            }
+            if (!Number.isFinite(delay)) delay = 0;
+            if (delay > 3600) delay = 3600;
+            if (command) commands.push({ command: command, delay: delay });
+        });
+        if (hasNegativeDelay) return null;
+        return {
+            name: quickCommandNameEl.value.trim(),
+            notes: quickCommandNotesEl.value,
+            commands: commands,
+        };
+    }
+
+    function formatQuickCommandDetail(config) {
+        if (!config) return '选择一个快捷命令查看详情';
+        const commands = config.commands || [];
+        const lines = [
+            '名称: ' + (config.name || ''),
+            '指令数: ' + commands.length,
+            '',
+            '指令:',
+        ];
+        commands.forEach(function(step, index) {
+            const delay = Number(step.delay || 0);
+            const suffix = delay > 0 ? '（延时 ' + delay + ' 秒）' : '';
+            lines.push((index + 1) + '. ' + step.command + suffix);
+        });
+        if (config.notes) {
+            lines.push('', '备注:', config.notes);
+        }
+        return lines.join('\n');
+    }
+
+    function renderQuickCommandButtons(items) {
+        if (!items || !items.length) {
+            quickCommandButtonsEl.innerHTML = '<div class="empty-hint">暂无快捷命令</div>';
+            return;
+        }
+        quickCommandButtonsEl.innerHTML = items.map(function(item) {
+            return '<button class="quick-command-run" type="button" data-id="' + escapeAttr(item.id) + '">' +
+                '<span class="quick-command-run-title">' + escapeHtml(item.name || item.id) + '</span>' +
+                '<span class="quick-command-run-meta">' + item.commands_count + ' 条指令</span>' +
+                '</button>';
+        }).join('');
+    }
+
+    function renderQuickCommandList(items) {
+        quickCommandItems = items || [];
+        renderQuickCommandButtons(quickCommandItems);
+        if (!quickCommandItems.length) {
+            quickCommandListEl.innerHTML = '<div class="empty-hint">暂无快捷命令</div>';
+            quickCommandDetailEl.textContent = '选择一个快捷命令查看详情';
+            quickCommandRunBtn.disabled = true;
+            quickCommandDeleteBtn.disabled = true;
+            quickCommandCopyBtn.disabled = true;
+            selectedQuickCommandId = '';
+            return;
+        }
+        quickCommandListEl.innerHTML = quickCommandItems.map(function(item) {
+            var cls = item.id === selectedQuickCommandId ? ' active' : '';
+            return '<div class="trigger-item' + cls + '" data-id="' + escapeAttr(item.id) + '">' +
+                '<div class="trigger-item-title">' + escapeHtml(item.name || item.id) + '</div>' +
+                '<div class="trigger-item-meta">' + item.commands_count + ' 条指令</div>' +
+                '</div>';
+        }).join('');
+        quickCommandListEl.querySelectorAll('.trigger-item').forEach(function(el, index) {
+            el.classList.add('list-enter');
+            el.style.animationDelay = Math.min(index * 18, 180) + 'ms';
+        });
+    }
+
+    function selectQuickCommand(id) {
+        selectedQuickCommandId = id || '';
+        var item = quickCommandItems.find(function(x) { return x.id === selectedQuickCommandId; });
+        quickCommandCurrentNameEl.textContent = item ? (item.name || item.id) : '未选择';
+        quickCommandDetailEl.textContent = formatQuickCommandDetail(item && item.config);
+        quickCommandDetailEl.classList.remove('flash');
+        void quickCommandDetailEl.offsetWidth;
+        quickCommandDetailEl.classList.add('flash');
+        if (item && item.config) fillQuickCommandForm(item.config);
+        quickCommandRunBtn.disabled = !item;
+        quickCommandDeleteBtn.disabled = !item;
+        quickCommandCopyBtn.disabled = !item;
+        quickCommandListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.toggle('active', el.getAttribute('data-id') === selectedQuickCommandId);
+        });
+    }
+
+    function executeQuickCommandById(id) {
+        var item = quickCommandItems.find(function(x) { return x.id === id; });
+        if (!item || !item.config) return;
+        sendQuickCommandMessage('execute', { id: id, config: item.config });
+    }
+
+    function handleQuickCommandList(msg) {
+        renderQuickCommandList(msg.items || []);
+        if (selectedQuickCommandId) selectQuickCommand(selectedQuickCommandId);
+        if (msg.status) setQuickCommandStatus(msg.status, 'ok');
+    }
+
+    function handleQuickCommandStatus(msg) {
+        if (msg.config) fillQuickCommandForm(msg.config);
+        if (msg.id) selectedQuickCommandId = msg.id;
+        if (msg.status) setQuickCommandStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+        renderQuickCommandList(quickCommandItems);
+        if (selectedQuickCommandId) selectQuickCommand(selectedQuickCommandId);
+    }
+
+    function handleQuickCommandEvent(msg) {
+        if (msg.command) showSentCommand(msg.command);
+    }
+
     document.querySelectorAll('.tab-btn[data-page]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const pageId = btn.getAttribute('data-page');
@@ -1225,7 +1430,22 @@
             void btn.offsetWidth;
             btn.classList.add('tab-hit');
             if (pageId === 'triggerPage') sendTriggerMessage('list');
+            if (pageId === 'quickCommandPage') sendQuickCommandMessage('list');
             if (pageId === 'gamePage') setTimeout(function() { fitAddon.fit(); }, 0);
+        });
+    });
+
+    document.querySelectorAll('.left-tab-btn[data-left-page]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const pageId = btn.getAttribute('data-left-page');
+            document.querySelectorAll('.left-tab-btn[data-left-page]').forEach(function(tab) {
+                tab.classList.toggle('active', tab === btn);
+            });
+            document.querySelectorAll('.left-pane').forEach(function(page) {
+                page.classList.toggle('active', page.id === pageId);
+            });
+            if (pageId === 'mapPane') setTimeout(function() { mapFitAddon.fit(); }, 0);
+            if (pageId === 'quickPane') sendQuickCommandMessage('list');
         });
     });
 
@@ -1291,6 +1511,72 @@
     });
 
     clearTriggerForm();
+
+    quickCommandButtonsEl.addEventListener('click', function(e) {
+        var btn = e.target.closest('.quick-command-run');
+        if (!btn) return;
+        executeQuickCommandById(btn.getAttribute('data-id'));
+    });
+
+    quickCommandListEl.addEventListener('click', function(e) {
+        var item = e.target.closest('.trigger-item');
+        if (!item) return;
+        e.stopPropagation();
+        selectQuickCommand(item.getAttribute('data-id'));
+    });
+
+    quickCommandRunBtn.addEventListener('click', function() {
+        if (selectedQuickCommandId) executeQuickCommandById(selectedQuickCommandId);
+    });
+
+    quickCommandNewBtn.addEventListener('click', function() {
+        startNewQuickCommand();
+    });
+
+    quickCommandCopyBtn.addEventListener('click', function() {
+        if (!selectedQuickCommandId) return;
+        var item = quickCommandItems.find(function(x) { return x.id === selectedQuickCommandId; });
+        if (!item || !item.config) return;
+        var copiedConfig = JSON.parse(JSON.stringify(item.config));
+        copiedConfig.name = (copiedConfig.name || selectedQuickCommandId) + '_副本';
+        sendQuickCommandMessage('save', { id: '', config: copiedConfig });
+    });
+
+    quickCommandAddStepBtn.addEventListener('click', function() {
+        addQuickCommandStep('', '');
+    });
+
+    quickCommandStepsEl.addEventListener('click', function(e) {
+        var btn = e.target.closest('.quick-command-step-delete');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var row = btn.closest('.quick-command-step-row');
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+        setQuickCommandStatus('已删除指令，保存后生效', 'ok');
+    });
+
+    quickCommandSaveBtn.addEventListener('click', function() {
+        const config = getQuickCommandFormConfig();
+        if (!config) {
+            setQuickCommandStatus('延时秒不能填写负数', 'error');
+            alert('延时秒不能填写负数');
+            return;
+        }
+        sendQuickCommandMessage('save', { id: selectedQuickCommandId, config: config });
+    });
+
+    quickCommandDeleteBtn.addEventListener('click', function() {
+        if (!selectedQuickCommandId) return;
+        var item = quickCommandItems.find(function(x) { return x.id === selectedQuickCommandId; });
+        var name = item ? (item.name || item.id) : selectedQuickCommandId;
+        if (!confirm('确定要删除快捷命令「' + name + '」吗？')) return;
+        sendQuickCommandMessage('delete', { id: selectedQuickCommandId });
+        selectedQuickCommandId = '';
+        clearQuickCommandForm();
+    });
+
+    clearQuickCommandForm();
 
     // ─── 地图终端 ───
     const mapFitAddon = new FitAddon.FitAddon();
