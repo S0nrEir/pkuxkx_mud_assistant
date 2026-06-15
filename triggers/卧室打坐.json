@@ -26,6 +26,11 @@
       "keyword": "你一觉醒来，精神抖擞地活动了几下手脚",
       "command": "dazuo max",
       "delay": 0
+    },
+    {
+      "keyword": "你刚刚睡过一觉, 多睡对身体有害无益",
+      "command": "sleep",
+      "delay": 5.0
     }
   ]
 }
