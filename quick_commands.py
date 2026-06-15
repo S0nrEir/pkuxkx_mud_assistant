@@ -43,21 +43,34 @@ class QuickCommandService:
                 clean_steps.append({'command': command, 'delay': delay})
         return {
             'name': str(config.get('name') or '').strip(),
-            'alias': str(config.get('alias') or '').strip(),
+            'alias': str(config.get('alias') or '').strip().lstrip('$'),
             'notes': str(config.get('notes') or ''),
+            'pinned': config.get('pinned', True) is not False,
             'commands': clean_steps,
         }
 
-    def validate(self, config):
+    def validate(self, config, command_id=None):
         config = self.normalize(config)
         if not config['name']:
             raise ValueError('必须填写快捷命令名称')
+        if not config['alias']:
+            raise ValueError('必须填写触发词')
+        if re.search(r'\s', config['alias']):
+            raise ValueError('触发词不能包含空白字符')
         if not config['commands']:
             raise ValueError('至少填写一条指令')
+        alias = config['alias'].lower()
+        current_id = self.safe_id(command_id) if command_id else ''
+        for item in self.list():
+            if current_id and item['id'] == current_id:
+                continue
+            item_alias = str(item.get('config', {}).get('alias') or '').strip().lower()
+            if item_alias == alias:
+                raise ValueError(f'触发词已被「{item.get("name") or item["id"]}」使用')
         return config
 
     def save(self, config, command_id=None):
-        config = self.validate(config)
+        config = self.validate(config, command_id)
         os.makedirs(self.command_dir, exist_ok=True)
         old_id = self.safe_id(command_id) if command_id else ''
         new_id = self.safe_id(config['name'])
@@ -94,6 +107,7 @@ class QuickCommandService:
                 'id': command_id,
                 'name': config.get('name') or command_id,
                 'commands_count': len(config.get('commands') or []),
+                'pinned': config.get('pinned', True) is not False,
                 'config': config,
             })
         return items

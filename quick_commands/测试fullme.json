@@ -1,0 +1,12 @@
+{
+  "name": "测试fullme",
+  "alias": "f",
+  "notes": "",
+  "pinned": true,
+  "commands": [
+    {
+      "command": "fullme",
+      "delay": 0
+    }
+  ]
+}

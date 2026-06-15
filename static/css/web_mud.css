@@ -432,8 +432,26 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .quick-command-run:active { transform: scale(0.99); }
 .quick-command-run-title { display: block; font-weight: 700; color: #f0f6fc; }
 .quick-command-run-meta { display: block; margin-top: 2px; color: #8b949e; font-size: 11px; }
-.quick-command-step-row { display: grid; grid-template-columns: 1fr 72px 28px; gap: 6px; margin-bottom: 6px; }
+.quick-command-step-row { display: grid; grid-template-columns: 1fr 72px 28px; gap: 6px; margin-bottom: 6px; align-items: center; }
 .quick-command-step-row input { min-width: 0; }
+.quick-command-list-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 6px;
+    align-items: center;
+}
+.quick-command-list-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+}
+.quick-command-list-check input {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
 /* 输入框 */
 .input-bar {
     background: #161b22;

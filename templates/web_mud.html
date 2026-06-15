@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MUD Web Client</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-<link rel="stylesheet" href="/static/css/web_mud.css">
+<link rel="stylesheet" href="/static/css/web_mud.css?v=quick-command-20260615-5">
 
 </head>
 <body>
@@ -134,7 +134,6 @@
                 <div class="trigger-current">快捷命令：<span id="quickCommandCurrentName">未选择</span></div>
                 <div class="trigger-detail" id="quickCommandDetail">选择一个快捷命令查看详情</div>
                 <div class="trigger-actions trigger-main-actions">
-                    <button class="trigger-small-btn primary" id="quickCommandRunBtn" disabled>执行</button>
                     <button class="trigger-small-btn" id="quickCommandNewBtn">新建</button>
                     <button class="trigger-small-btn" id="quickCommandCopyBtn" disabled>复制</button>
                     <button class="trigger-small-btn" id="quickCommandAddStepBtn">添加指令</button>
@@ -156,9 +155,15 @@
                         <textarea id="quickCommandNotes" placeholder="可写用途、地点或注意事项"></textarea>
                     </div>
                     <div class="trigger-field">
-                        <label>执行指令</label>
-                        <div class="trigger-tip">每行一条指令；延时秒不填默认 0。</div>
-                        <div id="quickCommandSteps"></div>
+                        <label for="quickCommandCommand">实际指令</label>
+                        <div class="trigger-tip">输入触发词后实际发送到 MUD 的指令；需要多条时点“添加指令”。</div>
+                        <div id="quickCommandSteps">
+                            <div class="quick-command-step-row">
+                                <input type="text" class="quick-command-step-command" id="quickCommandCommand" placeholder="例如：eat gan liang">
+                                <input type="number" class="quick-command-step-delay" placeholder="延时秒" min="0" max="3600" step="0.1">
+                                <button class="trigger-small-btn danger quick-command-step-delete" type="button">×</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -204,7 +209,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
-<script src="/static/js/web_mud.js"></script>
+<script src="/static/js/web_mud.js?v=quick-command-20260615-5"></script>
 
 </body>
 </html>
