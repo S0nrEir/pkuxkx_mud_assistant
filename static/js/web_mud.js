@@ -149,6 +149,18 @@
         return '/fullme-proxy?url=' + encodeURIComponent(String(url || '').replace(/&amp;/g, '&'));
     }
 
+    function cacheBustUrl(url) {
+        const value = String(url || '').replace(/&amp;/g, '&');
+        if (!value) return '';
+        try {
+            const parsed = new URL(value, location.href);
+            parsed.searchParams.set('_refresh', Date.now().toString());
+            return parsed.href;
+        } catch (e) {
+            return value + (value.indexOf('?') === -1 ? '?' : '&') + '_refresh=' + Date.now();
+        }
+    }
+
     function pageUrlFromFullmeUrl(url) {
         const value = String(url || '').replace(/&amp;/g, '&');
         if (!value) return '';
@@ -897,9 +909,26 @@
     }
 
     function refreshFullmeImage() {
-        const mode = fullmeCommandMode.value === 'fullme' ? 'fullme' : 'report';
-        const command = mode === 'fullme' ? 'fullme' : 'ask yunyou sengren about 口令';
-        sendMudCommand(command);
+        const imageUrl = fullmeCurrentImageUrl || imageUrlFromFullmeUrl(fullmeCurrentUrl);
+        const pageUrl = fullmeCurrentUrl || pageUrlFromFullmeUrl(imageUrl);
+        if (!imageUrl && !pageUrl) return;
+
+        const refreshedImageUrl = cacheBustUrl(imageUrl || pageUrl);
+        fullmeInput.focus();
+
+        if (!fullmeImage.hidden && refreshedImageUrl) {
+            fullmeImage.src = isFullmeUrl(refreshedImageUrl)
+                ? proxyFullmeUrl(refreshedImageUrl)
+                : refreshedImageUrl;
+            return;
+        }
+
+        const refreshedPageUrl = cacheBustUrl(pageUrl || imageUrl);
+        if (refreshedPageUrl) {
+            fullmeFrame.src = isFullmeUrl(refreshedPageUrl)
+                ? proxyFullmeUrl(refreshedPageUrl)
+                : refreshedPageUrl;
+        }
     }
 
     fullmeCloseBtn.addEventListener('click', hideFullmePanel);
