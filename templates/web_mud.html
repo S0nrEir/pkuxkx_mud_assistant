@@ -64,6 +64,7 @@
             </div>
         </div>
     <div class="bottom-panel">
+        <div class="quick-command-suggest" id="quickCommandSuggest" hidden></div>
         <div class="input-bar">
             <input type="text" id="cmdInput" placeholder="输入命令..." autocomplete="off" autofocus>
             <button class="send-btn" id="sendBtn">发送</button>
@@ -145,6 +146,10 @@
                     <div class="trigger-field">
                         <label for="quickCommandName">快捷命令名称</label>
                         <input type="text" id="quickCommandName" placeholder="例如：回家补给">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="quickCommandAlias">触发词</label>
+                        <input type="text" id="quickCommandAlias" placeholder="例如：chi，对应输入 $chi">
                     </div>
                     <div class="trigger-field">
                         <label for="quickCommandNotes">备注</label>

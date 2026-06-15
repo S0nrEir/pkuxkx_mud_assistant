@@ -43,6 +43,7 @@ class QuickCommandService:
                 clean_steps.append({'command': command, 'delay': delay})
         return {
             'name': str(config.get('name') or '').strip(),
+            'alias': str(config.get('alias') or '').strip(),
             'notes': str(config.get('notes') or ''),
             'commands': clean_steps,
         }
