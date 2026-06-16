@@ -86,6 +86,10 @@
     const triggerStopBtn = document.getElementById('triggerStopBtn');
     const triggerStatusEl = document.getElementById('triggerStatus');
     const quickCommandButtonsEl = document.getElementById('quickCommandButtons');
+    const characterStatePanelEl = document.getElementById('characterStatePanel');
+    const inventoryStatePanelEl = document.getElementById('inventoryStatePanel');
+    let characterStateRefreshPending = false;
+    let characterStateRefreshTimer = null;
     const quickCommandCurrentNameEl = document.getElementById('quickCommandCurrentName');
     const quickCommandDetailEl = document.getElementById('quickCommandDetail');
     const quickCommandListEl = document.getElementById('quickCommandList');
@@ -129,6 +133,21 @@
         term.writeln('\r\n\x1b[48;5;236m\x1b[38;5;220m\x1b[1m[CMD]\x1b[0m \x1b[38;5;220m' + visibleCmd + '\x1b[0m\r\n');
     }
 
+    function isCharacterStateCommand(cmd) {
+        const parts = String(cmd || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (parts.length !== 1) return false;
+        return ['sc', 'score', 'hp', 'i', 'inventory'].indexOf(parts[0]) !== -1;
+    }
+
+    function scheduleCharacterStateRefresh(delay) {
+        if (!characterStatePanelEl && !inventoryStatePanelEl) return;
+        if (characterStateRefreshTimer) clearTimeout(characterStateRefreshTimer);
+        characterStateRefreshTimer = setTimeout(function() {
+            characterStateRefreshTimer = null;
+            loadCharacterState();
+        }, delay || 300);
+    }
+
     function sendMudCommand(cmd) {
         if (!cmd.trim() || !ws || ws.readyState !== WebSocket.OPEN) return false;
         const cleanCmd = cmd.trim();
@@ -138,6 +157,12 @@
             fullmePendingMode = 'report';
         }
         showSentCommand(cmd);
+        if (isCharacterStateCommand(cleanCmd)) {
+            characterStateRefreshPending = true;
+            scheduleCharacterStateRefresh(1200);
+            setTimeout(loadCharacterState, 3000);
+            setTimeout(loadCharacterState, 6500);
+        }
         ws.send(cmd + '\r');
         ws.send(JSON.stringify({ type: 'command', data: cleanCmd }));
         return true;
@@ -277,6 +302,7 @@
             syncMutedToBackend();
             sendTriggerMessage('list');
             loadQuickCommands();
+            loadCharacterState();
         };
 
         ws.onmessage = function(event) {
@@ -286,6 +312,9 @@
                 inspectFullmeText(text);
                 const processed = processMXP(text);
                 term.write(processed);
+                if (characterStateRefreshPending) {
+                    scheduleCharacterStateRefresh(500);
+                }
             } else {
                 // JSON 事件
                 try {
@@ -306,6 +335,9 @@
                         handleQuickCommandStatus(msg);
                     } else if (msg.type === 'quick_command_event') {
                         handleQuickCommandEvent(msg);
+                    } else if (msg.type === 'character_state') {
+                        characterStateRefreshPending = false;
+                        renderCharacterState(msg.data);
                     } else if (msg.type === 'map') {
                         // 地图数据 → 渲染到地图面板（垂直居中）
                         mapTerm.clear();
@@ -1763,6 +1795,395 @@
         if (msg.command) showSentCommand(msg.command);
     }
 
+    function formatCharacterStateTime(value) {
+        if (!value) return '未记录';
+        try {
+            return String(value).replace('T', ' ');
+        } catch (e) {
+            return String(value);
+        }
+    }
+
+    function cleanCharacterStateText(text) {
+        return String(text || '')
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]?/g, '')
+            .replace(/(^|[^\w])\[[0-9;]{1,24}[a-zA-Z]?/g, '$1')
+            .replace(/(^|[^\w]);[0-9;]{1,24}[a-zA-Z]?/g, '$1')
+            .replace(/(^|[^\w])m(?=\d|$)/g, '$1')
+            .replace(/\x1b\[[0-9]*z/g, '')
+            .replace(/<[^>]+>/g, '')
+            .replace(/\r/g, '');
+    }
+
+    function cleanCharacterStateAnsiLine(text) {
+        return String(text || '')
+            .replace(/\x1b\[[0-9]*z/g, '')
+            .replace(/<[^>]+>/g, '')
+            .replace(/\r/g, '')
+            .replace(/[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬╞╡╥╨╪]/g, ' ')
+            .replace(/^[>\s]+|[>\s]+$/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function ansiToHtml(text) {
+        const colorMap = {
+            30: '#8b949e', 31: '#ff7b72', 32: '#7ee787', 33: '#e3b341',
+            34: '#79c0ff', 35: '#d2a8ff', 36: '#76e3ea', 37: '#c9d1d9',
+            90: '#6e7681', 91: '#ffa198', 92: '#56d364', 93: '#f2cc60',
+            94: '#a5d6ff', 95: '#d2a8ff', 96: '#76e3ea', 97: '#f0f6fc'
+        };
+        let result = '';
+        let color = '';
+        let bold = false;
+        let open = false;
+
+        function closeSpan() {
+            if (open) {
+                result += '</span>';
+                open = false;
+            }
+        }
+
+        function openSpan() {
+            closeSpan();
+            const styles = [];
+            if (color) styles.push('color:' + color);
+            if (bold) styles.push('font-weight:700');
+            if (styles.length) {
+                result += '<span style="' + escapeAttr(styles.join(';')) + '">';
+                open = true;
+            }
+        }
+
+        String(text || '').split(/(\x1b\[[0-9;]*m)/g).forEach(function(part) {
+            if (!part) return;
+            const match = part.match(/^\x1b\[([0-9;]*)m$/);
+            if (match) {
+                const codes = (match[1] || '0').split(';').filter(Boolean).map(function(code) {
+                    return parseInt(code, 10);
+                });
+                if (!codes.length) codes.push(0);
+                for (let i = 0; i < codes.length; i++) {
+                    const code = codes[i];
+                    if (code === 0) {
+                        color = '';
+                        bold = false;
+                    } else if (code === 1) {
+                        bold = true;
+                    } else if (code === 2 || code === 22) {
+                        bold = false;
+                    } else if (colorMap[code]) {
+                        color = colorMap[code];
+                    } else if (code === 38 && codes[i + 1] === 5 && Number.isFinite(codes[i + 2])) {
+                        color = ansi256ToHex(codes[i + 2]);
+                        i += 2;
+                    } else if (code === 39) {
+                        color = '';
+                    }
+                }
+                openSpan();
+            } else {
+                result += escapeHtml(part);
+            }
+        });
+        closeSpan();
+        return result;
+    }
+
+    function ansi256ToHex(n) {
+        n = Math.max(0, Math.min(255, Number(n) || 0));
+        const base = [
+            '#000000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0',
+            '#808080', '#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff', '#ffffff'
+        ];
+        if (n < 16) return base[n];
+        if (n >= 232) {
+            const v = 8 + (n - 232) * 10;
+            const h = v.toString(16).padStart(2, '0');
+            return '#' + h + h + h;
+        }
+        n -= 16;
+        const r = Math.floor(n / 36);
+        const g = Math.floor((n % 36) / 6);
+        const b = n % 6;
+        const levels = [0, 95, 135, 175, 215, 255];
+        return '#' + [levels[r], levels[g], levels[b]].map(function(v) {
+            return v.toString(16).padStart(2, '0');
+        }).join('');
+    }
+
+    function normalizeCharacterStateLine(line) {
+        return cleanCharacterStateText(line)
+            .replace(/[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬╞╡╥╨╪]/g, ' ')
+            .replace(/^[>\s]+|[>\s]+$/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function isCharacterStateNoiseLine(line) {
+        const compact = String(line || '').replace(/[\s\-_=+|·.。:：,，、[\]()（）【】<>]/g, '');
+        if (!compact) return true;
+        if (/^(人物详情|个人状态|个人信息|门派履历|北大侠客行|装备|财宝|货币|食物|其它|其他)$/.test(compact)) return true;
+        return /^[▁▂▃▄▅▆▇█▀▌▐■□◆◇●○·—]+$/.test(compact);
+    }
+
+    function pushUniqueCharacterItem(items, seen, value) {
+        const text = String(value || '').replace(/\s+/g, ' ').trim();
+        if (!text || seen[text]) return;
+        seen[text] = true;
+        items.push({ text: text, name: '', value: text });
+    }
+
+    function pushUniqueCharacterField(items, seen, name, value, group) {
+        name = String(name || '').replace(/\s+/g, ' ').trim();
+        value = String(value || '').replace(/\s+/g, ' ').trim();
+        const text = name ? (name + ': ' + value) : value;
+        if (!text || seen[text]) return;
+        seen[text] = true;
+        items.push({ text: text, name: name, value: value, group: group || '' });
+    }
+
+    function pushUniqueCharacterHtml(items, seen, text, html) {
+        text = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!text || seen[text]) return;
+        seen[text] = true;
+        items.push({ text: text, name: '', value: text, html: html || escapeHtml(text) });
+    }
+
+    function characterStateTone(key, item) {
+        const text = String((item && item.text) || '');
+        const name = String((item && item.name) || '');
+        if (key === 'inventory') {
+            if (/黄金|白银|铜板|钱|存款|负重/.test(text)) return 'money';
+            if (/食|饮|水|豆腐|点心|酒|鸡|杏|葫芦/.test(text)) return 'food';
+            if (/衣|帽|鞋|剑|刀|甲|盾|护|兵|装备|穿戴|布衣|皮靴/.test(text)) return 'equip';
+            return 'item';
+        }
+        if (/气血|精神|内力|精力|真气/.test(name)) return 'vital';
+        if (/状态|疲|健康|战意/.test(name + text)) return /疲|伤|毒|饿|渴/.test(text) ? 'warn' : 'ok';
+        if (/膂力|悟性|根骨|身法|福缘|容貌|灵性|胆识/.test(name)) return 'attr';
+        if (/经验|潜能|活跃|声望|积分|存款|黄金|白银|铜板/.test(name + text)) return 'money';
+        return 'info';
+    }
+
+    const inventoryEquipmentSlots = [
+        '帽子', '副兵', '护面', '护腕', '披风', '手套', '护肩', '铠甲',
+        '衣服', '腰带', '盾牌', '主兵', '护腿', '鞋子', '项链', '护心', '戒指'
+    ];
+
+    const characterFieldNames = {
+        score: [
+            '膂力', '悟性', '根骨', '身法', '福缘', '容貌', '灵性', '胆识',
+            '国籍', '户籍', '上线', '签到', '性别', '姻缘', '年龄', '生日',
+            '身高', '体重', '门派', '师承', '门忠', '出师', '叛师',
+            '杀生', '被杀', '死亡', '杀气', '职业', '道德', '声望', '愿望',
+            '存款', '门派例钱', '国家积分', '活跃兑换'
+        ],
+        hp: [
+            '精神', '精力', '气血', '内力', '真气', '战意',
+            '食物', '饮水', '潜能', '经验', '状态'
+        ]
+    };
+
+    function cleanInventoryEquipmentValue(segment) {
+        return normalizeCharacterStateLine(segment)
+            .replace(/--/g, ' ')
+            .replace(/[▁▂▃▄▅▆▇█▀▌▐■□◆◇●○·—]+/g, ' ')
+            .replace(/\(\s*\+\d+\s*\)/g, function(mark) { return ' ' + mark.replace(/\s+/g, '') + ' '; })
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function extractInventoryEquipmentItems(text) {
+        const bySlot = {};
+        const slotPattern = new RegExp('\\[\\s*(' + inventoryEquipmentSlots.join('|') + ')\\s*\\]', 'g');
+        cleanCharacterStateText(text).split('\n').forEach(function(rawLine) {
+            let line = normalizeCharacterStateLine(rawLine);
+            if (!line || line.indexOf('[') === -1) return;
+            line = line.replace(/\s+/g, ' ');
+            const matches = [];
+            let match;
+            while ((match = slotPattern.exec(line)) !== null) {
+                matches.push({
+                    slot: match[1].trim(),
+                    start: match.index,
+                    end: match.index + match[0].length,
+                });
+            }
+            matches.forEach(function(slotMatch, index) {
+                const prevEnd = index ? matches[index - 1].end : 0;
+                const nextStart = index + 1 < matches.length ? matches[index + 1].start : line.length;
+                const before = cleanInventoryEquipmentValue(line.slice(prevEnd, slotMatch.start));
+                const after = cleanInventoryEquipmentValue(line.slice(slotMatch.end, nextStart));
+                const value = before || after || '--';
+                if (!bySlot[slotMatch.slot] || bySlot[slotMatch.slot] === '--' || value !== '--') {
+                    bySlot[slotMatch.slot] = value;
+                }
+            });
+        });
+        const items = [];
+        const seen = {};
+        inventoryEquipmentSlots.forEach(function(slot) {
+            if (Object.prototype.hasOwnProperty.call(bySlot, slot)) {
+                pushUniqueCharacterField(items, seen, slot, bySlot[slot], 'equipment');
+            }
+        });
+        return items;
+    }
+
+    function pushCharacterFieldsFromLine(items, seen, key, line) {
+        const names = characterFieldNames[key] || [];
+        if (!names.length) return false;
+        let matched = false;
+
+        line.replace(/【\s*([^】]+?)\s*】\s*([^【]+)/g, function(_, name, value) {
+            const cleanName = normalizeCharacterStateLine(name);
+            const cleanedValue = normalizeCharacterStateLine(value).replace(/^[：:]+/, '').trim();
+            if (cleanName && cleanedValue) {
+                pushUniqueCharacterField(items, seen, cleanName, cleanedValue);
+                matched = true;
+            }
+            return _;
+        });
+        if (matched) return true;
+
+        const pattern = new RegExp('(' + names.map(function(name) {
+            return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }).join('|') + ')\\s*[：:]', 'g');
+        const matches = [];
+        let match;
+        while ((match = pattern.exec(line)) !== null) {
+            matches.push({
+                name: match[1],
+                start: match.index,
+                end: match.index + match[0].length,
+            });
+        }
+        matches.forEach(function(current, index) {
+            const nextStart = index + 1 < matches.length ? matches[index + 1].start : line.length;
+            const value = normalizeCharacterStateLine(line.slice(current.end, nextStart))
+                .replace(/^[\[\s]+|[\]\s]+$/g, '')
+                .trim();
+            if (value) {
+                pushUniqueCharacterField(items, seen, current.name, value);
+                matched = true;
+            }
+        });
+        return matched;
+    }
+
+    function pushInventoryItemsFromLine(items, seen, line) {
+        if (!line || isCharacterStateNoiseLine(line)) return;
+        if (/^\[[^\]]+\]$/.test(line.replace(/\s+/g, ''))) return;
+        if (inventoryEquipmentSlots.some(function(slot) { return line.indexOf('[' + slot + ']') !== -1; })) return;
+        if (/^[▁▂▃▄▅▆▇█▀▌▐■□◆◇●○·—\s]+$/.test(line)) return;
+
+        let matched = false;
+        line.split(/\s{2,}/).forEach(function(part) {
+            const item = cleanInventoryEquipmentValue(part);
+            if (!item || isCharacterStateNoiseLine(item)) return;
+            if (/^[\[\]装财货食其它其他饰品\s]+$/.test(item)) return;
+            pushUniqueCharacterItem(items, seen, item);
+            matched = true;
+        });
+        if (matched) return;
+        pushUniqueCharacterItem(items, seen, cleanInventoryEquipmentValue(line));
+    }
+
+    function summarizeCharacterStateSection(key, text) {
+        const limits = { score: 48, hp: 24, inventory: 120 };
+        const items = [];
+        const seen = {};
+        if (key !== 'inventory') {
+            cleanCharacterStateText(text).split('\n').forEach(function(rawLine) {
+                if (items.length >= (limits[key] || 24)) return;
+                const line = normalizeCharacterStateLine(rawLine);
+                if (isCharacterStateNoiseLine(line)) return;
+                if (!/[：:【】]|\d/.test(line)) return;
+                if (pushCharacterFieldsFromLine(items, seen, key, line)) return;
+                pushUniqueCharacterHtml(items, seen, line, ansiToHtml(cleanCharacterStateAnsiLine(rawLine)));
+            });
+            return items.slice(0, limits[key] || 24);
+        }
+        if (key === 'inventory') {
+            extractInventoryEquipmentItems(text).forEach(function(item) {
+                pushUniqueCharacterField(items, seen, item.name, item.value, item.group);
+            });
+        }
+        cleanCharacterStateText(text).split('\n').forEach(function(rawLine) {
+            if (items.length >= (limits[key] || 24)) return;
+            const line = normalizeCharacterStateLine(rawLine);
+            pushInventoryItemsFromLine(items, seen, line);
+        });
+        return items.slice(0, limits[key] || 24);
+    }
+
+    function renderCharacterStateCard(key, section) {
+        section = section || {};
+        const items = summarizeCharacterStateSection(key, section.text || '');
+        const label = section.label || key;
+        const command = section.command ? ' · ' + escapeHtml(section.command) : '';
+        const time = formatCharacterStateTime(section.updated_at);
+        const equipmentItems = key === 'inventory' ? items.filter(function(item) { return item.group === 'equipment'; }) : [];
+        const normalItems = key === 'inventory' ? items.filter(function(item) { return item.group !== 'equipment'; }) : items;
+        const equipmentTable = equipmentItems.length
+            ? '<div class="inventory-equipment-grid">' + equipmentItems.map(function(item) {
+                const value = item.value || item.text || '--';
+                return '<div class="inventory-equipment-cell">' +
+                    '<span class="inventory-equipment-slot">' + escapeHtml(item.name) + '</span>' +
+                    '<span class="inventory-equipment-value">' + escapeHtml(value) + '</span>' +
+                '</div>';
+            }).join('') + '</div>'
+            : '';
+        const list = normalItems.length
+            ? '<ul class="character-state-list">' + normalItems.map(function(item) {
+                const tone = characterStateTone(key, item);
+                if (item.html) return '<li class="tone-server">' + item.html + '</li>';
+                const name = item.name ? '<span class="character-state-name">' + escapeHtml(item.name) + '</span><span class="character-state-sep">: </span>' : '';
+                const value = '<span class="character-state-value">' + escapeHtml(item.value || item.text) + '</span>';
+                return '<li class="tone-' + escapeAttr(tone) + '">' + name + value + '</li>';
+            }).join('') + '</ul>'
+            : '';
+        const body = equipmentTable + list || '<span class="empty-hint">暂无记录</span>';
+        return '<div class="character-state-card' + (items.length ? ' updated' : '') + '">' +
+            '<div class="character-state-head">' +
+                '<span>' + escapeHtml(label) + command + '</span>' +
+                '<span class="character-state-time">' + escapeHtml(time) + '</span>' +
+            '</div>' +
+            '<div class="character-state-text">' +
+                body +
+            '</div>' +
+        '</div>';
+    }
+
+    function renderCharacterState(state) {
+        if (!characterStatePanelEl && !inventoryStatePanelEl) return;
+        characterStateRefreshPending = false;
+        const sections = (state && state.sections) || {};
+        if (characterStatePanelEl) {
+            const characterHtml = ['score', 'hp'].map(function(key) {
+                return renderCharacterStateCard(key, sections[key]);
+            }).join('');
+            characterStatePanelEl.innerHTML = characterHtml || '<div class="empty-hint">输入 sc、hp 后自动记录人物信息</div>';
+        }
+        if (inventoryStatePanelEl) {
+            inventoryStatePanelEl.innerHTML = renderCharacterStateCard('inventory', sections.inventory);
+        }
+    }
+
+    function loadCharacterState() {
+        if ((!characterStatePanelEl && !inventoryStatePanelEl) || typeof fetch !== 'function') return;
+        fetch('/character-state', { cache: 'no-store' })
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('status ' + resp.status);
+                return resp.json();
+            })
+            .then(renderCharacterState)
+            .catch(function() {});
+    }
+
     document.querySelectorAll('.tab-btn[data-page]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const pageId = btn.getAttribute('data-page');
@@ -1792,6 +2213,7 @@
             });
             if (pageId === 'mapPane') setTimeout(function() { mapFitAddon.fit(); }, 0);
             if (pageId === 'quickPane') loadQuickCommands();
+            if (pageId === 'characterPane' || pageId === 'inventoryPane') loadCharacterState();
         });
     });
 

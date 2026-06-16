@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 import config
+from character_state import default_character_state_store, section_for_command
 from chat_monitor import is_chat_message
 from mud_telnet import gbk_safe_split, strip_iac_and_respond
 from quick_commands import (
@@ -72,6 +73,8 @@ class MudSession:
         self._trigger_generation = 0
         self._mud_chunk_seq = 0
         self._raw_log_file = None   # 原始字节日志文件句柄
+        self.character_state_store = default_character_state_store
+        self._character_capture = None
 
     async def connect(self):
         """连接 MUD 服务器"""
@@ -87,6 +90,7 @@ class MudSession:
 
         try:
             await self.connect()
+            await self._send_character_state()
 
             # 并发执行：读 MUD + 读 WebSocket
             mud_task = asyncio.create_task(self._read_mud_loop())
@@ -125,12 +129,128 @@ class MudSession:
         except Exception:
             pass
 
+    async def _send_character_state(self, state=None):
+        await self._send_ws_json({
+            'type': 'character_state',
+            'data': state or self.character_state_store.load(),
+        })
+
+    async def _start_character_capture(self, command):
+        await self._finish_character_capture()
+        section = section_for_command(command)
+        if not section:
+            return
+        self._character_capture = {
+            'section': section,
+            'command': str(command or '').strip(),
+            'parts': [],
+            'started': False,
+        }
+
+    async def _append_character_capture(self, text):
+        if not self._character_capture:
+            return
+        text = str(text or '')
+        clean = self._clean_line(text)
+        if self._character_capture_prompt_seen(clean):
+            await self._finish_character_capture()
+            return
+        if not self._character_capture.get('started'):
+            if self._character_capture_marker_found(self._character_capture.get('section'), clean):
+                self._character_capture['started'] = True
+            else:
+                return
+        line = self._character_capture_storage_line(self._character_capture.get('section'), text)
+        if not line:
+            return
+        self._character_capture['parts'].append(line)
+
+    @staticmethod
+    def _character_capture_prompt_seen(clean):
+        clean = str(clean or '').strip()
+        return clean == '>' or clean.startswith('>') or clean.endswith('>')
+
+    @classmethod
+    def _character_capture_storage_line(cls, section, text):
+        clean = cls._clean_line(text)
+        clean = str(clean or '').replace('\r', '').strip()
+        if not clean or cls._character_capture_prompt_seen(clean):
+            return ''
+        clean = cls._character_capture_simplify_line(clean)
+        if not clean or '\ufffd' in clean:
+            return ''
+        if cls._character_capture_noise_line(section, clean):
+            return ''
+        return clean
+
+    @staticmethod
+    def _character_capture_simplify_line(clean):
+        clean = str(clean or '')
+        clean = re.sub(r'\x1b\[[0-9;]*[A-Za-z]?', ' ', clean)
+        clean = re.sub(r'(?<![A-Za-z0-9])\[[0-9;]{1,24}[A-Za-z]?', ' ', clean)
+        clean = re.sub(r'(?<![A-Za-z0-9]);[0-9;]{1,24}[A-Za-z]?', ' ', clean)
+        clean = re.sub(r'(?<![A-Za-z0-9])m(?=\d|$)', ' ', clean)
+        clean = re.sub(r'[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬╞╡╥╨╪]', ' ', clean)
+        clean = re.sub(r'[▁▂▃▄▅▆▇█▀▌▐■□◆◇●○·—]+', ' ', clean)
+        clean = re.sub(r'(?<![A-Za-z0-9])o(?![A-Za-z0-9])', ' ', clean)
+        clean = re.sub(r'\s+', ' ', clean)
+        return clean.strip()
+
+    @staticmethod
+    def _character_capture_noise_line(section, clean):
+        compact = re.sub(r'[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬╞╡╥╨╪]', '', str(clean or ''))
+        compact = re.sub(r'[\s\-_=+|·.。:：,，、\[\]()（）【】<>]+', '', compact)
+        if not compact:
+            return True
+        if compact in {'人物详情', '个人状态', '个人信息', '门派履历', '北大侠客行', '装备', '财宝', '货币', '食物', '其它', '其他'}:
+            return True
+        has_text = re.search(r'[\u4e00-\u9fffA-Za-z0-9]', compact) is not None
+        if not has_text:
+            return True
+        if section in {'score', 'hp'} and re.fullmatch(r'[▁▂▃▄▅▆▇█▀▌▐■□◆◇●○·—]+', compact):
+            return True
+        return False
+
+    @staticmethod
+    def _character_capture_marker_found(section, clean):
+        clean = str(clean or '')
+        if section == 'score':
+            return '人物详情' in clean
+        if section == 'hp':
+            return '个人状态' in clean
+        if section == 'inventory':
+            return (
+                '你共携带' in clean
+                or '你身上没有' in clean
+                or '身上没有任何' in clean
+                or '[装' in clean
+                or '[货' in clean
+                or '[食' in clean
+            )
+        return False
+
+    async def _finish_character_capture(self):
+        capture = self._character_capture
+        self._character_capture = None
+        if not capture:
+            return
+        text = '\n'.join(capture.get('parts') or []).strip()
+        if not text:
+            return
+        state = self.character_state_store.update(
+            capture.get('section'),
+            capture.get('command'),
+            text,
+        )
+        await self._send_character_state(state)
+
     async def _send_mud_command(self, command, event_type='trigger_event', track_trigger=True):
         command = str(command or '').strip()
         if not command or not self.writer:
             return
         self.writer.write((command + '\r\n').encode('gbk', errors='replace'))
         await self.writer.drain()
+        await self._start_character_capture(command)
         if track_trigger:
             self._trigger_response_parts = []
             self._trigger_waiting_chunk = self._mud_chunk_seq
@@ -506,6 +626,7 @@ class MudSession:
 
                 # 记录日志
                 self._log_data(line_text, 'recv')
+                await self._append_character_capture(line_text)
                 await self._handle_trigger_text(line_text)
 
                 # save 回复检测：收到提示符说明 save 完成，发送 quit
@@ -565,6 +686,7 @@ class MudSession:
                         return
 
                     self._log_data(text, 'recv')
+                    await self._append_character_capture(text)
                     await self._handle_trigger_text(text)
 
                     # 检测编码选择提示
@@ -660,6 +782,7 @@ class MudSession:
             self._log_raw_bytes(data, 'send')
             self.writer.write(data)
             await self.writer.drain()
+            await self._start_character_capture(text_data)
             self._log_data(text_data, 'send')
 
     # ─── 命令历史 ───

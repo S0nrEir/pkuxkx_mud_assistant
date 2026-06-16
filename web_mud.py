@@ -12,6 +12,7 @@ import urllib.request
 from datetime import datetime
 
 import config
+from character_state import default_character_state_store
 from mud_session import MudSession
 
 HTML_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'templates', 'web_mud.html')
@@ -25,7 +26,7 @@ def load_html_page():
 
 from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
-from starlette.responses import HTMLResponse, PlainTextResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from starlette.staticfiles import StaticFiles
 
 _fullme_cookie_jar = http.cookiejar.CookieJar()
@@ -144,6 +145,10 @@ async def fullme_proxy(request):
     )
 
 
+async def character_state(request):
+    return JSONResponse(default_character_state_store.load())
+
+
 async def websocket_handler(websocket):
     _rt_log('[WS] 新连接')
     await websocket.accept()
@@ -155,6 +160,7 @@ async def websocket_handler(websocket):
 routes = [
     Route('/', endpoint=index_page),
     Route('/fullme-proxy', endpoint=fullme_proxy),
+    Route('/character-state', endpoint=character_state),
     WebSocketRoute('/ws', endpoint=websocket_handler),
 ]
 

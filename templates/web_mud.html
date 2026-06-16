@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MUD Web Client</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-<link rel="stylesheet" href="/static/css/web_mud.css?v=quick-command-20260615-5">
+<link rel="stylesheet" href="/static/css/web_mud.css?v=character-state-20260616-7">
 
 </head>
 <body>
@@ -41,6 +41,8 @@
                 <div class="left-tabs">
                     <button class="left-tab-btn active" data-left-page="mapPane" type="button" id="mapTabBtn">地图</button>
                     <button class="left-tab-btn" data-left-page="quickPane" type="button" id="quickCommandTabBtn">快捷命令</button>
+                    <button class="left-tab-btn" data-left-page="characterPane" type="button" id="characterStateTabBtn">人物信息</button>
+                    <button class="left-tab-btn" data-left-page="inventoryPane" type="button" id="inventoryStateTabBtn">道具</button>
                 </div>
                 <div class="left-pane active" id="mapPane">
                     <div class="panel-label" id="mapLabel">地图</div>
@@ -49,6 +51,16 @@
                 <div class="left-pane" id="quickPane">
                     <div class="quick-command-buttons" id="quickCommandButtons">
                         <div class="empty-hint">暂无快捷命令</div>
+                    </div>
+                </div>
+                <div class="left-pane" id="characterPane">
+                    <div class="character-state" id="characterStatePanel">
+                        <div class="empty-hint">输入 sc、hp、i 后自动记录人物信息</div>
+                    </div>
+                </div>
+                <div class="left-pane" id="inventoryPane">
+                    <div class="character-state inventory-state" id="inventoryStatePanel">
+                        <div class="empty-hint">输入 i 后自动记录道具信息</div>
                     </div>
                 </div>
             </div>
@@ -209,7 +221,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
-<script src="/static/js/web_mud.js?v=quick-command-20260615-5"></script>
+<script src="/static/js/web_mud.js?v=character-state-20260616-7"></script>
 
 </body>
 </html>
