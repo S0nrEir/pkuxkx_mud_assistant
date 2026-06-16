@@ -1,0 +1,12 @@
+{
+  "name": "石经峪->石门寺",
+  "alias": "sjysms",
+  "notes": "",
+  "pinned": true,
+  "commands": [
+    {
+      "command": "node walk sjy_sms",
+      "delay": 0
+    }
+  ]
+}

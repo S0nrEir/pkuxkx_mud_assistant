@@ -1,0 +1,16 @@
+{
+  "name": "石门山摘杏",
+  "notes": "",
+  "rules": [
+    {
+      "keyword": "你伸长了手，从杏树上摘下了一只杏子。",
+      "command": "zhai",
+      "delay": 0
+    },
+    {
+      "keyword": "你正忙着呢。",
+      "command": "zhai",
+      "delay": 1.0
+    }
+  ]
+}

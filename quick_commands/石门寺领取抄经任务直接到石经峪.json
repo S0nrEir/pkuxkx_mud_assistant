@@ -1,0 +1,16 @@
+{
+  "name": "石门寺领取抄经任务直接到石经峪",
+  "alias": "smssjy",
+  "notes": "",
+  "pinned": true,
+  "commands": [
+    {
+      "command": "ask sengren about job",
+      "delay": 0
+    },
+    {
+      "command": "node walk sms_sjy",
+      "delay": 0
+    }
+  ]
+}
