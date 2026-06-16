@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 
 import config
+from agent_control import agent_control, clean_text as agent_clean_text
 from chat_monitor import is_chat_message
 from mud_telnet import gbk_safe_split, strip_iac_and_respond
 from quick_commands import (
@@ -87,6 +88,7 @@ class MudSession:
 
         try:
             await self.connect()
+            agent_control.register_session(self)
 
             # 并发执行：读 MUD + 读 WebSocket
             mud_task = asyncio.create_task(self._read_mud_loop())
@@ -101,6 +103,7 @@ class MudSession:
             print(f"[会话错误] {e}")
         finally:
             await self.cleanup()
+            agent_control.unregister_session(self)
 
     async def cleanup(self):
         self.running = False
@@ -140,6 +143,20 @@ class MudSession:
             'command': command,
             'active': self.triggers.active,
         })
+        agent_control.record_event(event_type, {
+            'command': command,
+            'active': self.triggers.active,
+        })
+
+    async def send_agent_command(self, command, reason=''):
+        command = str(command or '').strip()
+        if not command or not self.writer:
+            return
+        await self._send_mud_command(command, event_type='agent_event', track_trigger=False)
+        self._add_history(command)
+        self.runtime_log(f'[AGENT] {command[:500]}')
+        if reason:
+            self.runtime_log(f'[AGENT_REASON] {str(reason)[:500]}')
 
     @staticmethod
     def _split_trigger_commands(command):
@@ -482,6 +499,10 @@ class MudSession:
                 # 聊天消息始终推送到右侧面板（不受本地屏蔽影响）
                 if is_chat:
                     clean_text = _ANSI_RE.sub('', stripped).strip()
+                    agent_control.record_event('chat', {
+                        'time': datetime.now().strftime('%H:%M:%S'),
+                        'text': clean_text,
+                    })
                     msg = json.dumps({
                         'type': 'chat',
                         'data': {
@@ -536,6 +557,10 @@ class MudSession:
                                 await self.ws.send_text(msg)
                             except Exception:
                                 pass
+                            agent_control.record_event('map', {
+                                'text': agent_clean_text(map_text),
+                                'area': map_msg.get('area'),
+                            })
                             self.runtime_log(f'[MAP] 自动小地图，{len(self._minimap_lines)} 行'
                                              f'{f" · {area_info[1]}" if area_info else ""}')
                         self._minimap_active = False
@@ -744,6 +769,10 @@ class MudSession:
             stripped = line.strip()
             if stripped:
                 self.runtime_log(f'[{marker}] {stripped[:500]}')
+                agent_control.record_event(
+                    'send' if direction == 'send' else 'recv',
+                    {'text': agent_clean_text(stripped)[:2000]},
+                )
 
 
 # ═══════════════════════════════════════════

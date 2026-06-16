@@ -12,6 +12,7 @@ import urllib.request
 from datetime import datetime
 
 import config
+from agent_control import agent_control
 from mud_session import MudSession
 
 HTML_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'templates', 'web_mud.html')
@@ -25,7 +26,7 @@ def load_html_page():
 
 from starlette.applications import Starlette
 from starlette.routing import Route, WebSocketRoute
-from starlette.responses import HTMLResponse, PlainTextResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from starlette.staticfiles import StaticFiles
 
 _fullme_cookie_jar = http.cookiejar.CookieJar()
@@ -144,6 +145,79 @@ async def fullme_proxy(request):
     )
 
 
+def _is_local_request(request):
+    client = request.client
+    host = client.host if client else ''
+    return host in ('127.0.0.1', '::1', 'localhost')
+
+
+def _reject_nonlocal(request):
+    if _is_local_request(request):
+        return None
+    return JSONResponse({'ok': False, 'error': 'local_requests_only'}, status_code=403)
+
+
+async def agent_status(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    return JSONResponse(agent_control.status())
+
+
+async def agent_observe(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    since = request.query_params.get('since', 0)
+    limit = request.query_params.get('limit', 100)
+    include_runtime = request.query_params.get('runtime', '1') != '0'
+    return JSONResponse(agent_control.observe(since=since, limit=limit, include_runtime=include_runtime))
+
+
+async def _read_agent_json(request):
+    try:
+        return await request.json()
+    except Exception:
+        return {}
+
+
+async def agent_command(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    data = await _read_agent_json(request)
+    result = await agent_control.send_command(
+        data.get('command', ''),
+        reason=data.get('reason', ''),
+        approved=bool(data.get('approved', False)),
+    )
+    status_code = 200 if result.get('ok') else 409 if result.get('needs_approval') else 400
+    return JSONResponse(result, status_code=status_code)
+
+
+async def agent_batch(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    data = await _read_agent_json(request)
+    result = await agent_control.send_batch(data.get('commands', []))
+    return JSONResponse(result, status_code=200 if result.get('ok') else 409)
+
+
+async def agent_pause(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    return JSONResponse(agent_control.pause())
+
+
+async def agent_resume(request):
+    rejected = _reject_nonlocal(request)
+    if rejected:
+        return rejected
+    return JSONResponse(agent_control.resume())
+
+
 async def websocket_handler(websocket):
     _rt_log('[WS] 新连接')
     await websocket.accept()
@@ -155,6 +229,12 @@ async def websocket_handler(websocket):
 routes = [
     Route('/', endpoint=index_page),
     Route('/fullme-proxy', endpoint=fullme_proxy),
+    Route('/agent/status', endpoint=agent_status, methods=['GET']),
+    Route('/agent/observe', endpoint=agent_observe, methods=['GET']),
+    Route('/agent/command', endpoint=agent_command, methods=['POST']),
+    Route('/agent/batch', endpoint=agent_batch, methods=['POST']),
+    Route('/agent/pause', endpoint=agent_pause, methods=['POST']),
+    Route('/agent/resume', endpoint=agent_resume, methods=['POST']),
     WebSocketRoute('/ws', endpoint=websocket_handler),
 ]
 
