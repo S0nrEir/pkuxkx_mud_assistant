@@ -1,5 +1,6 @@
 """Persistent script configuration and runtime service."""
 
+import asyncio
 import importlib.util
 import json
 import os
@@ -177,6 +178,13 @@ class ScriptTools:
         if self._send_command:
             await self._send_command(command)
 
+    async def delay(self, seconds):
+        try:
+            seconds = float(seconds or 0)
+        except (TypeError, ValueError):
+            seconds = 0
+        await asyncio.sleep(max(0, seconds))
+
     def log(self, message):
         self._runtime_log(f'[SCRIPT] {message}')
 
@@ -197,6 +205,23 @@ class ScriptRuntime:
     def active(self):
         return bool(self.config and self.module)
 
+    def _cleanup_module(self, module):
+        cleanup = getattr(module, 'cleanup', None)
+        if not callable(cleanup):
+            return
+        try:
+            result = cleanup()
+            if hasattr(result, '__await__'):
+                try:
+                    asyncio.get_running_loop().create_task(result)
+                except RuntimeError:
+                    close = getattr(result, 'close', None)
+                    if callable(close):
+                        close()
+                    self.runtime_log('[SCRIPT] 异步清理需要在事件循环中执行，已跳过')
+        except Exception:
+            self.runtime_log('[SCRIPT] 清理失败:\n' + traceback.format_exc())
+
     def load(self, script_id, config=None):
         script_id = self.config_service.safe_id(script_id)
         source_config = config if config is not None else self.config_service.load(script_id)
@@ -213,12 +238,14 @@ class ScriptRuntime:
         handler = getattr(module, 'handle_message', None)
         if not callable(handler):
             raise ValueError('脚本必须实现 handle_message(message, tools) 接口')
+        self._cleanup_module(self.module)
         self.active_id = script_id
         self.config = loaded_config
         self.module = module
         return loaded_config
 
     def stop(self):
+        self._cleanup_module(self.module)
         self.active_id = ''
         self.config = None
         self.module = None
