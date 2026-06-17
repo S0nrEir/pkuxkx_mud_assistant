@@ -202,6 +202,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 .trigger-item.active { background: #1f2937; color: #79c0ff; }
 .trigger-item:hover { transform: translateX(-2px); }
 .trigger-item.loaded { background: #1a2f1e; border-left: 3px solid #3fb950; }
+.trigger-item.missing { border-left: 3px solid #f85149; }
 .trigger-item.active { box-shadow: inset 3px 0 0 #58a6ff; }
 .trigger-item.loaded.active { background: #1a3424; box-shadow: inset 3px 0 0 #3fb950; }
 .trigger-item.list-enter { animation: triggerItemIn 0.22s ease-out both; }

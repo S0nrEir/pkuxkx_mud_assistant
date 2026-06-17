@@ -132,6 +132,27 @@ triggers/*.json
 
 `command` 支持用分号或换行分隔多条命令。
 
+### 脚本系统页
+
+脚本系统用于需要保存状态的自动化流程。脚本配置索引存放在：
+
+```text
+scripts/index.json
+```
+
+每个索引项包含脚本名称、注释和相对 `scripts/` 目录的 Python 文件路径。Web 页面会从索引加载脚本列表，当前会话同一时间只能启用一个脚本。脚本系统和触发器互斥：如果其中一个已经启用，需要先手动停用它，才能启用另一个。
+
+脚本文件必须实现统一接口：
+
+```python
+async def handle_message(message, tools):
+    text = tools.clean(message)
+    if tools.contains(text, "桃花阵"):
+        await tools.send("look")
+```
+
+`message` 是当前收到的服务器消息；`tools` 提供 `clean`、`contains`、`contains_any`、`regex`、`send`、`log` 和 `now` 等辅助函数。
+
 ## Telnet 代理
 
 代理入口是 `proxy.py`。

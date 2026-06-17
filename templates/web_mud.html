@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MUD Web Client</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-<link rel="stylesheet" href="/static/css/web_mud.css?v=character-state-20260616-7">
+<link rel="stylesheet" href="/static/css/web_mud.css?v=script-system-20260617-1">
 
 </head>
 <body>
@@ -14,9 +14,10 @@
         <div class="tab-buttons">
             <button class="tab-btn active" data-page="gamePage">游戏</button>
             <button class="tab-btn" id="btnTriggers" data-page="triggerPage">触发器</button>
+            <button class="tab-btn" id="btnScripts" data-page="scriptPage">脚本系统</button>
             <button class="tab-btn" id="btnQuickCommands" data-page="quickCommandPage">快捷命令</button>
         </div>
-        <div class="toolbar-trigger-current">当前触发器：<span id="toolbarTriggerCurrentName">无</span></div>
+        <div class="toolbar-trigger-current">当前自动化：<span id="toolbarTriggerCurrentName">无</span></div>
         <button class="toolbar-btn danger" id="btnQuit">退出游戏</button>
     </div>
 
@@ -140,6 +141,48 @@
         </div>
     </div>
 
+    <div class="page" id="scriptPage">
+        <div class="trigger-panel" id="scriptPanel">
+            <div class="trigger-main script-main">
+                <div class="trigger-current">当前脚本：<span id="scriptCurrentName">无</span></div>
+                <div class="trigger-detail" id="scriptDetail">选择一个脚本查看详情</div>
+                <div class="trigger-actions trigger-main-actions">
+                    <button class="trigger-small-btn primary" id="scriptLoadBtn" disabled>启用</button>
+                    <button class="trigger-small-btn" id="scriptNewBtn">新建配置</button>
+                    <button class="trigger-small-btn" id="scriptCopyBtn" disabled>复制配置</button>
+                    <button class="trigger-small-btn primary" id="scriptSaveBtn">保存配置</button>
+                    <button class="trigger-small-btn" id="scriptStopBtn">停用</button>
+                    <button class="trigger-small-btn danger" id="scriptDeleteBtn" disabled>删除配置</button>
+                </div>
+                <div class="trigger-status" id="scriptStatus">未启用脚本系统</div>
+                <div class="trigger-editor">
+                    <div class="trigger-field">
+                        <label for="scriptName">脚本名称</label>
+                        <input type="text" id="scriptName" placeholder="例如：桃花阵任务">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="scriptPath">脚本路径</label>
+                        <input type="text" id="scriptPath" placeholder="例如：taohua_zhen.py">
+                    </div>
+                    <div class="trigger-field">
+                        <label for="scriptNotes">注释</label>
+                        <textarea id="scriptNotes" placeholder="用途、状态文件、注意事项"></textarea>
+                    </div>
+                    <div class="trigger-field">
+                        <label>脚本接口</label>
+                        <div class="trigger-tip">脚本文件放在 scripts 目录下，并实现 handle_message(message, tools)。脚本系统和触发器互斥，需要先停用当前自动化再启用另一个。</div>
+                    </div>
+                </div>
+            </div>
+            <div class="trigger-browser">
+                <div class="trigger-current">索引配置中的脚本</div>
+                <div class="trigger-list" id="scriptList">
+                    <div class="empty-hint">暂无脚本配置</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="page" id="quickCommandPage">
         <div class="trigger-panel" id="quickCommandPanel">
             <div class="trigger-main">
@@ -221,7 +264,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
-<script src="/static/js/web_mud.js?v=character-state-20260616-7"></script>
+<script src="/static/js/web_mud.js?v=script-system-20260617-1"></script>
 
 </body>
 </html>

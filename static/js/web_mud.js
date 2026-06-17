@@ -85,6 +85,19 @@
     const triggerSaveBtn = document.getElementById('triggerSaveBtn');
     const triggerStopBtn = document.getElementById('triggerStopBtn');
     const triggerStatusEl = document.getElementById('triggerStatus');
+    const scriptCurrentNameEl = document.getElementById('scriptCurrentName');
+    const scriptDetailEl = document.getElementById('scriptDetail');
+    const scriptListEl = document.getElementById('scriptList');
+    const scriptLoadBtn = document.getElementById('scriptLoadBtn');
+    const scriptNewBtn = document.getElementById('scriptNewBtn');
+    const scriptCopyBtn = document.getElementById('scriptCopyBtn');
+    const scriptSaveBtn = document.getElementById('scriptSaveBtn');
+    const scriptStopBtn = document.getElementById('scriptStopBtn');
+    const scriptDeleteBtn = document.getElementById('scriptDeleteBtn');
+    const scriptStatusEl = document.getElementById('scriptStatus');
+    const scriptNameEl = document.getElementById('scriptName');
+    const scriptPathEl = document.getElementById('scriptPath');
+    const scriptNotesEl = document.getElementById('scriptNotes');
     const quickCommandButtonsEl = document.getElementById('quickCommandButtons');
     const characterStatePanelEl = document.getElementById('characterStatePanel');
     const inventoryStatePanelEl = document.getElementById('inventoryStatePanel');
@@ -106,6 +119,9 @@
     let triggerItems = [];
     let selectedTriggerId = '';
     let activeTriggerId = '';
+    let scriptItems = [];
+    let selectedScriptId = '';
+    let activeScriptId = '';
     let quickCommandItems = [];
     let selectedQuickCommandId = '';
     let selectedQuickCommandPinned = true;
@@ -301,6 +317,7 @@
             cmdInput.focus();
             syncMutedToBackend();
             sendTriggerMessage('list');
+            sendScriptMessage('list');
             loadQuickCommands();
             loadCharacterState();
         };
@@ -329,6 +346,12 @@
                         handleTriggerStatus(msg);
                     } else if (msg.type === 'trigger_event') {
                         handleTriggerEvent(msg);
+                    } else if (msg.type === 'script_list') {
+                        handleScriptList(msg);
+                    } else if (msg.type === 'script_status') {
+                        handleScriptStatus(msg);
+                    } else if (msg.type === 'script_event') {
+                        handleScriptEvent(msg);
                     } else if (msg.type === 'quick_command_list') {
                         handleQuickCommandList(msg);
                     } else if (msg.type === 'quick_command_status') {
@@ -1322,19 +1345,27 @@
 
     function handleTriggerList(msg) {
         activeTriggerId = msg.active_id || '';
+        if (activeTriggerId) activeScriptId = '';
         renderTriggerList(msg.items || []);
         if (activeTriggerId && !selectedTriggerId) selectedTriggerId = activeTriggerId;
         if (selectedTriggerId) selectTrigger(selectedTriggerId);
         if (msg.status) setTriggerStatus(msg.status, 'ok');
+        updateActiveScriptDisplay();
     }
 
     function handleTriggerStatus(msg) {
         if (msg.config) fillTriggerForm(msg.config);
-        if (msg.id && msg.active) activeTriggerId = msg.id;
+        if (msg.id && msg.active) {
+            activeTriggerId = msg.id;
+            activeScriptId = '';
+        }
         if (msg.active === false) activeTriggerId = '';
         if (msg.id) selectedTriggerId = msg.id;
         if (msg.status) setTriggerStatus(msg.status, msg.ok === false ? 'error' : 'ok');
-        if (msg.active === false) {
+        if (msg.ok === false && msg.status) alert(msg.status);
+        if (activeScriptId) {
+            updateActiveScriptDisplay();
+        } else if (msg.active === false) {
             setActiveTriggerDisplay('无');
         } else if (msg.id && msg.active && msg.config) {
             setActiveTriggerDisplay(msg.config.name || msg.id);
@@ -1347,6 +1378,159 @@
     }
 
     function handleTriggerEvent(msg) {
+        if (msg.command) showSentCommand(msg.command);
+    }
+
+    // ─── 脚本系统 ───
+    function setScriptStatus(text, kind) {
+        scriptStatusEl.textContent = text || '';
+        scriptStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
+        scriptStatusEl.classList.remove('flash');
+        void scriptStatusEl.offsetWidth;
+        scriptStatusEl.classList.add('flash');
+    }
+
+    function sendScriptMessage(action, data) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            setScriptStatus('未连接，无法操作', 'error');
+            return false;
+        }
+        ws.send(JSON.stringify(Object.assign({ type: 'script', action: action }, data || {})));
+        return true;
+    }
+
+    function clearScriptForm() {
+        scriptNameEl.value = '';
+        scriptPathEl.value = '';
+        scriptNotesEl.value = '';
+        scriptCurrentNameEl.textContent = activeScriptId || '无';
+    }
+
+    function startNewScript() {
+        selectedScriptId = '';
+        clearScriptForm();
+        scriptDetailEl.textContent = '正在新建脚本配置';
+        scriptLoadBtn.disabled = true;
+        scriptDeleteBtn.disabled = true;
+        scriptCopyBtn.disabled = true;
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        setScriptStatus('正在新建脚本配置', 'ok');
+        scriptNameEl.focus();
+    }
+
+    function fillScriptForm(config) {
+        config = config || {};
+        scriptNameEl.value = config.name || '';
+        scriptPathEl.value = config.path || '';
+        scriptNotesEl.value = config.notes || '';
+    }
+
+    function getScriptFormConfig() {
+        return {
+            name: scriptNameEl.value.trim(),
+            path: scriptPathEl.value.trim(),
+            notes: scriptNotesEl.value,
+        };
+    }
+
+    function formatScriptDetail(item) {
+        if (!item || !item.config) return '选择一个脚本查看详情';
+        const config = item.config;
+        const lines = [
+            '名称: ' + (config.name || ''),
+            '路径: scripts/' + (config.path || ''),
+            '文件: ' + (item.exists ? '存在' : '未找到'),
+        ];
+        if (config.notes) {
+            lines.push('', '注释:', config.notes);
+        }
+        return lines.join('\n');
+    }
+
+    function updateActiveScriptDisplay() {
+        var item = scriptItems.find(function(x) { return x.id === activeScriptId; });
+        scriptCurrentNameEl.textContent = activeScriptId ? ((item && item.name) || activeScriptId) : '无';
+        if (activeScriptId) {
+            toolbarTriggerCurrentNameEl.textContent = '脚本：' + ((item && item.name) || activeScriptId);
+        } else {
+            updateActiveTriggerDisplay();
+        }
+    }
+
+    function renderScriptList(items) {
+        scriptItems = items || [];
+        updateActiveScriptDisplay();
+        if (!scriptItems.length) {
+            scriptListEl.innerHTML = '<div class="empty-hint">暂无脚本配置</div>';
+            scriptDetailEl.textContent = '选择一个脚本查看详情';
+            scriptLoadBtn.disabled = true;
+            scriptDeleteBtn.disabled = true;
+            scriptCopyBtn.disabled = true;
+            selectedScriptId = '';
+            return;
+        }
+        scriptListEl.innerHTML = scriptItems.map(function(item) {
+            var cls = '';
+            if (item.id === activeScriptId) cls += ' loaded';
+            if (item.id === selectedScriptId) cls += ' active';
+            if (!item.exists) cls += ' missing';
+            var badge = item.id === activeScriptId ? '<span class="trigger-loaded-badge">已启用</span>' : '';
+            var existsText = item.exists ? '文件存在' : '文件未找到';
+            return '<div class="trigger-item' + cls + '" data-id="' + escapeAttr(item.id) + '">' +
+                '<div class="trigger-item-title"><span class="trigger-item-name">' + escapeHtml(item.name || item.id) + '</span>' + badge + '</div>' +
+                '<div class="trigger-item-meta">' + escapeHtml(item.path || '') + ' · ' + existsText + '</div>' +
+                '</div>';
+        }).join('');
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el, index) {
+            el.classList.add('list-enter');
+            el.style.animationDelay = Math.min(index * 18, 180) + 'ms';
+        });
+        scriptLoadBtn.disabled = !selectedScriptId || (selectedScriptId === activeScriptId);
+    }
+
+    function selectScript(id) {
+        selectedScriptId = id || '';
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
+        scriptDetailEl.textContent = formatScriptDetail(item);
+        scriptDetailEl.classList.remove('flash');
+        void scriptDetailEl.offsetWidth;
+        scriptDetailEl.classList.add('flash');
+        if (item && item.config) fillScriptForm(item.config);
+        scriptDeleteBtn.disabled = !item;
+        scriptLoadBtn.disabled = !item || (selectedScriptId === activeScriptId);
+        scriptCopyBtn.disabled = !item;
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.toggle('active', el.getAttribute('data-id') === selectedScriptId);
+        });
+    }
+
+    function handleScriptList(msg) {
+        activeScriptId = msg.active_id || '';
+        renderScriptList(msg.items || []);
+        if (activeScriptId && !selectedScriptId) selectedScriptId = activeScriptId;
+        if (selectedScriptId) selectScript(selectedScriptId);
+        if (msg.status) setScriptStatus(msg.status, 'ok');
+        if (activeScriptId) activeTriggerId = '';
+    }
+
+    function handleScriptStatus(msg) {
+        if (msg.config) fillScriptForm(msg.config);
+        if (msg.id && msg.active) {
+            activeScriptId = msg.id;
+            activeTriggerId = '';
+        }
+        if (msg.active === false) activeScriptId = '';
+        if (msg.id) selectedScriptId = msg.id;
+        if (msg.status) setScriptStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+        if (msg.ok === false && msg.status) alert(msg.status);
+        updateActiveScriptDisplay();
+        renderScriptList(scriptItems);
+        if (selectedScriptId) selectScript(selectedScriptId);
+    }
+
+    function handleScriptEvent(msg) {
         if (msg.command) showSentCommand(msg.command);
     }
 
@@ -1808,8 +1992,8 @@
         return String(text || '')
             .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
             .replace(/\x1b\[[0-9;]*[a-zA-Z]?/g, '')
-            .replace(/(^|[^\w])\[[0-9;]{1,24}[a-zA-Z]?/g, '$1')
-            .replace(/(^|[^\w]);[0-9;]{1,24}[a-zA-Z]?/g, '$1')
+            .replace(/(^|[^\w])\[[0-9;]{1,24}(?:[a-zA-Z])?/g, '$1')
+            .replace(/(^|[^\w]);[0-9;]{1,24}(?:[a-zA-Z])?/g, '$1')
             .replace(/(^|[^\w])m(?=\d|$)/g, '$1')
             .replace(/\x1b\[[0-9]*z/g, '')
             .replace(/<[^>]+>/g, '')
@@ -1999,9 +2183,21 @@
     function extractInventoryEquipmentItems(text) {
         const bySlot = {};
         const slotPattern = new RegExp('\\[\\s*(' + inventoryEquipmentSlots.join('|') + ')\\s*\\]', 'g');
-        cleanCharacterStateText(text).split('\n').forEach(function(rawLine) {
+        const lines = cleanCharacterStateText(text).split('\n');
+        let pendingSlot = '';
+        lines.forEach(function(rawLine) {
             let line = normalizeCharacterStateLine(rawLine);
-            if (!line || line.indexOf('[') === -1) return;
+            if (!line) return;
+            if (pendingSlot && line.indexOf('[') === -1 && !isCharacterStateNoiseLine(line)) {
+                const pendingValue = cleanInventoryEquipmentValue(line);
+                if (pendingValue && pendingValue !== '--') {
+                    bySlot[pendingSlot] = pendingValue;
+                }
+                pendingSlot = '';
+                return;
+            }
+            pendingSlot = '';
+            if (line.indexOf('[') === -1) return;
             line = line.replace(/\s+/g, ' ');
             const matches = [];
             let match;
@@ -2020,6 +2216,9 @@
                 const value = before || after || '--';
                 if (!bySlot[slotMatch.slot] || bySlot[slotMatch.slot] === '--' || value !== '--') {
                     bySlot[slotMatch.slot] = value;
+                }
+                if (index === matches.length - 1 && value === '--') {
+                    pendingSlot = slotMatch.slot;
                 }
             });
         });
@@ -2197,6 +2396,7 @@
             void btn.offsetWidth;
             btn.classList.add('tab-hit');
             if (pageId === 'triggerPage') sendTriggerMessage('list');
+            if (pageId === 'scriptPage') sendScriptMessage('list');
             if (pageId === 'quickCommandPage') loadQuickCommands();
             if (pageId === 'gamePage') setTimeout(function() { fitAddon.fit(); }, 0);
         });
@@ -2226,6 +2426,12 @@
 
     triggerLoadBtn.addEventListener('click', function() {
         if (!selectedTriggerId) return;
+        if (activeScriptId) {
+            const message = '脚本系统正在启用，请先停用脚本系统再启用触发器';
+            setTriggerStatus(message, 'error');
+            alert(message);
+            return;
+        }
         sendTriggerMessage('load', { id: selectedTriggerId });
     });
 
@@ -2279,6 +2485,66 @@
     });
 
     clearTriggerForm();
+
+    scriptListEl.addEventListener('click', function(e) {
+        var item = e.target.closest('.trigger-item');
+        if (!item) return;
+        e.stopPropagation();
+        selectScript(item.getAttribute('data-id'));
+    });
+
+    scriptLoadBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
+        if (activeTriggerId) {
+            const message = '触发器正在启用，请先停用触发器再启用脚本系统';
+            setScriptStatus(message, 'error');
+            alert(message);
+            return;
+        }
+        sendScriptMessage('load', { id: selectedScriptId });
+    });
+
+    scriptNewBtn.addEventListener('click', function() {
+        startNewScript();
+    });
+
+    scriptCopyBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
+        if (!item || !item.config) return;
+        var copiedConfig = JSON.parse(JSON.stringify(item.config));
+        copiedConfig.name = (copiedConfig.name || selectedScriptId) + '_副本';
+        sendScriptMessage('save', { id: '', config: copiedConfig });
+    });
+
+    scriptSaveBtn.addEventListener('click', function() {
+        const config = getScriptFormConfig();
+        if (!config.name) {
+            setScriptStatus('必须填写脚本名称', 'error');
+            scriptNameEl.focus();
+            return;
+        }
+        if (!config.path) {
+            setScriptStatus('必须填写脚本路径', 'error');
+            scriptPathEl.focus();
+            return;
+        }
+        sendScriptMessage('save', { id: selectedScriptId, config: config });
+    });
+
+    scriptStopBtn.addEventListener('click', function() {
+        sendScriptMessage('stop');
+    });
+
+    scriptDeleteBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
+        var name = item ? (item.name || item.id) : selectedScriptId;
+        if (!confirm('确定要删除脚本配置「' + name + '」吗？')) return;
+        sendScriptMessage('delete', { id: selectedScriptId });
+    });
+
+    clearScriptForm();
 
     quickCommandButtonsEl.addEventListener('click', function(e) {
         var btn = e.target.closest('.quick-command-run');
