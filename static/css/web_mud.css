@@ -166,7 +166,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     width: 100%;
     background: #161b22;
     display: grid;
-    grid-template-columns: minmax(480px, 58%) minmax(300px, 42%);
+    grid-template-columns: minmax(320px, 3fr) minmax(0, 7fr);
     border-top: 1px solid #30363d;
 }
 .trigger-current {
@@ -190,25 +190,38 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     min-width: 0;
     min-height: 0;
 }
-.trigger-list { flex: 1; min-height: 0; overflow-y: auto; border-left: 1px solid #21262d; }
+.trigger-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    border-left: 1px solid #21262d;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: 8px;
+}
 .trigger-item {
     padding: 8px 10px;
-    border-bottom: 1px solid #21262d;
+    border: 1px solid #21262d;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+    min-width: 0;
     transition: background 0.16s ease, color 0.16s ease, transform 0.14s ease, border-color 0.16s ease;
 }
 .trigger-item:hover,
 .trigger-item.active { background: #1f2937; color: #79c0ff; }
-.trigger-item:hover { transform: translateX(-2px); }
+.trigger-item:hover { transform: translateY(-1px); }
 .trigger-item.loaded { background: #1a2f1e; border-left: 3px solid #3fb950; }
 .trigger-item.missing { border-left: 3px solid #f85149; }
 .trigger-item.active { box-shadow: inset 3px 0 0 #58a6ff; }
 .trigger-item.loaded.active { background: #1a3424; box-shadow: inset 3px 0 0 #3fb950; }
 .trigger-item.list-enter { animation: triggerItemIn 0.22s ease-out both; }
 .trigger-loaded-badge { color: #3fb950; font-size: 10px; font-weight: 400; margin-left: 6px; animation: subtlePulse 1.8s ease-in-out infinite; }
-.trigger-item-title { font-weight: 700; margin-bottom: 3px; }
-.trigger-item-meta { color: #8b949e; font-size: 11px; }
+.trigger-item-title { font-weight: 700; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trigger-item-meta { color: #8b949e; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trigger-detail {
     padding: 10px 12px;
     overflow-y: auto;
@@ -696,6 +709,20 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .chat-msg .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
 
+/* 脚本醒目通知：大号加粗，红底白字，写入聊天/消息列表 */
+.chat-msg.script-notify {
+    background: #5c1d1d;
+    border: 1px solid #f85149;
+    color: #ffd7d5;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 8px;
+    margin: 6px 0;
+    line-height: 1.4;
+}
+.chat-msg.script-notify .chat-time { color: #ffb3b0; font-size: 12px; margin-right: 6px; }
+
 /* 空状态 */
 .empty-hint {
     color: #6e7681;
@@ -704,6 +731,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     text-align: center;
     font-size: 12px;
 }
+.trigger-list > .empty-hint { grid-column: 1 / -1; }
 
 /* fullme 工号 / 验证码显示 */
 .fullme-panel {

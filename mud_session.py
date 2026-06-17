@@ -71,7 +71,11 @@ class MudSession:
         self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
-        self.scripts = ScriptRuntime(runtime_log=self.runtime_log, send_command=self._send_script_command)
+        self.scripts = ScriptRuntime(
+            runtime_log=self.runtime_log,
+            send_command=self._send_script_command,
+            notify=self._send_script_notify,
+        )
         self._script_lock = asyncio.Lock()
         self._trigger_lock = asyncio.Lock()
         self._trigger_tasks = set()
@@ -273,6 +277,28 @@ class MudSession:
     async def _send_script_command(self, command):
         await self._send_mud_command(command, event_type='script_event', track_trigger=False)
         self._add_history(str(command or '').strip())
+
+    def _send_script_notify(self, message):
+        """把脚本要醒目显示的消息推送到网页消息列表（聊天面板）。"""
+        payload = {
+            'type': 'script_notify',
+            'data': {
+                'time': datetime.now().strftime('%H:%M:%S'),
+                'text': str(message or ''),
+            },
+        }
+        msg = json.dumps(payload, ensure_ascii=False)
+
+        async def _send():
+            try:
+                await self.ws.send_text(msg)
+            except Exception:
+                pass
+
+        try:
+            asyncio.create_task(_send())
+        except RuntimeError:
+            pass
 
     @staticmethod
     def _split_trigger_commands(command):

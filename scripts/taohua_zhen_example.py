@@ -52,6 +52,7 @@ state = {
     'send_token': 0,
     'busy_retries': 0,
     'round_completed': False,
+    'stopped': False,
 }
 
 
@@ -76,6 +77,7 @@ def _remember_gua(gua, tools):
     state['last_command'] = ''
     state['busy_retries'] = 0
     state['round_completed'] = False
+    state['stopped'] = False
     if commands:
         tools.log(f'记录桃花阵卦象：{gua} -> {" ".join(directions)} -> {" ".join(commands)}')
     else:
@@ -104,6 +106,24 @@ def _cancel_pending_send():
     if task and not task.done():
         task.cancel()
     state['pending_task'] = None
+
+
+def _stop_auto_walking(tools, reason, message=''):
+    """停止自动行走并清理待发送命令。
+
+    天色大变等导致卦象失效时调用：取消后台延迟任务、清掉迷宫等待状态，
+    并在网页消息列表输出一条醒目的大号加粗消息提示脚本已停止。
+    message 留空时使用默认提示。
+    """
+    _cancel_pending_send()
+    was_running = state.get('in_maze') or state.get('waiting')
+    state['in_maze'] = False
+    state['waiting'] = False
+    state['last_command'] = ''
+    state['stopped'] = True
+    tools.log(f'桃花阵停止自动行走：{reason}')
+    if was_running:
+        tools.notify(message or f'桃花阵脚本已停止：{reason}')
 
 
 async def _send_current_direction(tools):
@@ -182,10 +202,21 @@ async def handle_message(message, tools):
         _remember_gua(match.group(1), tools)
         return
 
+    if '天色大变' in text and '卦' in text:
+        # 天色大变，陆乘风给你算的卦也不那么准了：卦象失效，必须停止自动行走。
+        # 只有脚本正在桃花阵里自动行走时才提示，避免走出阵后的重复通知。
+        if state.get('in_maze') or state.get('waiting') or state.get('pending_task'):
+            _stop_auto_walking(tools, '天色大变，卦象失效', '⚠ 桃花阵脚本已停止：天色大变，卦象失效了')
+        else:
+            state['stopped'] = True
+            tools.log('天色大变，但当前不在桃花阵自动行走，跳过停止提示')
+        return
+
     if '你莫名其妙地走出了桃花阵' in text:
         state['in_maze'] = False
         state['waiting'] = False
         state['last_command'] = ''
+        state['stopped'] = False
         _cancel_pending_send()
         tools.log('已经离开桃花阵，停止自动行走')
         return
@@ -215,6 +246,7 @@ async def handle_message(message, tools):
         if not state.get('in_maze'):
             tools.log('进入桃花阵，准备自动行走')
         state['in_maze'] = True
+        state['stopped'] = False
         if not state.get('waiting') and not state.get('pending_task'):
             _schedule_send(tools, MOVE_DELAY_SECONDS)
         return
@@ -225,3 +257,4 @@ def cleanup():
     state['in_maze'] = False
     state['waiting'] = False
     state['last_command'] = ''
+    state['stopped'] = False

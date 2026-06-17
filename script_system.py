@@ -156,9 +156,11 @@ class ScriptConfigService:
 class ScriptTools:
     """Helpers passed into custom scripts."""
 
-    def __init__(self, send_command=None, runtime_log=None):
+    def __init__(self, send_command=None, runtime_log=None, notify=None):
         self._send_command = send_command
         self._runtime_log = runtime_log or (lambda msg: None)
+        # notify(message) -> None，把一条醒目消息推送到网页消息列表
+        self._notify = notify or (lambda message: None)
 
     def clean(self, text):
         return _CLEAN_RE.sub('', str(text or '')).strip()
@@ -188,15 +190,27 @@ class ScriptTools:
     def log(self, message):
         self._runtime_log(f'[SCRIPT] {message}')
 
+    def notify(self, message):
+        """在网页消息列表输出一条醒目的大号加粗消息。
+
+        和 send 一样，实际推送由运行时注入的回调完成，脚本只需调用
+        tools.notify('要显示的文本')。
+        """
+        try:
+            self._notify(str(message or ''))
+        except Exception:
+            pass
+
     def now(self):
         return time.time()
 
 
 class ScriptRuntime:
-    def __init__(self, config_service=None, runtime_log=None, send_command=None):
+    def __init__(self, config_service=None, runtime_log=None, send_command=None, notify=None):
         self.config_service = config_service or default_script_service
         self.runtime_log = runtime_log or (lambda msg: None)
         self.send_command = send_command
+        self.notify = notify or (lambda message: None)
         self.active_id = ''
         self.config = None
         self.module = None
@@ -253,7 +267,11 @@ class ScriptRuntime:
     async def handle_message(self, message):
         if not self.active:
             return
-        tools = ScriptTools(send_command=self.send_command, runtime_log=self.runtime_log)
+        tools = ScriptTools(
+            send_command=self.send_command,
+            runtime_log=self.runtime_log,
+            notify=self.notify,
+        )
         handler = getattr(self.module, 'handle_message', None)
         try:
             result = handler(message, tools)

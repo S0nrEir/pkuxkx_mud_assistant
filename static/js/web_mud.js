@@ -352,6 +352,8 @@
                         handleScriptStatus(msg);
                     } else if (msg.type === 'script_event') {
                         handleScriptEvent(msg);
+                    } else if (msg.type === 'script_notify') {
+                        addScriptNotify(msg.data);
                     } else if (msg.type === 'quick_command_list') {
                         handleQuickCommandList(msg);
                     } else if (msg.type === 'quick_command_status') {
@@ -1015,6 +1017,22 @@
         }
 
         // 自动滚动到底部
+        chatPanelEl.scrollTop = chatPanelEl.scrollHeight;
+    }
+
+    // ─── 脚本醒目通知（大号加粗，红底，写入消息列表） ───
+    function addScriptNotify(data) {
+        if (!chatInitialized) {
+            chatPanelEl.innerHTML = '';
+            chatInitialized = true;
+        }
+        const div = document.createElement('div');
+        div.className = 'chat-msg script-notify';
+        div.innerHTML = '<span class="chat-time">' + escapeHtml((data && data.time) || '') + '</span>' + escapeHtml((data && data.text) || '');
+        chatPanelEl.appendChild(div);
+        while (chatPanelEl.children.length > 200) {
+            chatPanelEl.removeChild(chatPanelEl.firstChild);
+        }
         chatPanelEl.scrollTop = chatPanelEl.scrollHeight;
     }
 
