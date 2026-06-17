@@ -709,19 +709,18 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .chat-msg .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
 
-/* 脚本醒目通知：大号加粗，红底白字，写入聊天/消息列表 */
+/* 脚本醒目通知：加粗，写入聊天/消息列表（无红底） */
 .chat-msg.script-notify {
-    background: #5c1d1d;
-    border: 1px solid #f85149;
-    color: #ffd7d5;
-    font-size: 18px;
+    background: #161b22;
+    border-left: 3px solid #f0883e;
+    color: #ffb454;
+    font-size: 15px;
     font-weight: 700;
-    text-align: center;
-    padding: 10px 8px;
-    margin: 6px 0;
+    padding: 6px 8px;
+    margin: 4px 0;
     line-height: 1.4;
 }
-.chat-msg.script-notify .chat-time { color: #ffb3b0; font-size: 12px; margin-right: 6px; }
+.chat-msg.script-notify .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
 
 /* 空状态 */
 .empty-hint {
