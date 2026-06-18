@@ -365,6 +365,8 @@
                         renderCharacterState(msg.data);
                     } else if (msg.type === 'map') {
                         // 地图数据 → 渲染到地图面板（垂直居中）
+                        // 前端默认隐藏地图面板，未初始化时直接忽略，避免报错。
+                        if (!mapReady) return;
                         mapTerm.clear();
                         var mapLines = msg.data.split('\n').filter(function(l) { return l.trim(); });
                         var totalRows = mapTerm.rows;
@@ -2429,7 +2431,7 @@
             document.querySelectorAll('.left-pane').forEach(function(page) {
                 page.classList.toggle('active', page.id === pageId);
             });
-            if (pageId === 'mapPane') setTimeout(function() { mapFitAddon.fit(); }, 0);
+            if (pageId === 'mapPane' && mapReady) setTimeout(function() { mapFitAddon.fit(); }, 0);
             if (pageId === 'quickPane') loadQuickCommands();
             if (pageId === 'characterPane' || pageId === 'inventoryPane') loadCharacterState();
         });
@@ -2647,6 +2649,7 @@
     clearQuickCommandForm();
 
     // ─── 地图终端 ───
+    // 地图功能保留，但前端默认不再渲染：仅当地图容器存在且可见时才初始化。
     const mapFitAddon = new FitAddon.FitAddon();
     const mapTerm = new Terminal({
         fontSize: 12,
@@ -2670,10 +2673,15 @@
         cols: 80,
         rows: 20,
     });
-    mapTerm.open(document.getElementById('mapTerminal'));
-    mapTerm.loadAddon(mapFitAddon);
-    mapFitAddon.fit();
-    new ResizeObserver(() => mapFitAddon.fit()).observe(document.getElementById('mapTerminal'));
+    var mapReady = false;
+    var mapContainer = document.getElementById('mapTerminal');
+    if (mapContainer && !mapContainer.hidden && !mapContainer.closest('[hidden]')) {
+        mapTerm.open(mapContainer);
+        mapTerm.loadAddon(mapFitAddon);
+        mapFitAddon.fit();
+        new ResizeObserver(() => mapFitAddon.fit()).observe(mapContainer);
+        mapReady = true;
+    }
 
     // ─── 退出游戏 ───
     var btnQuit = document.getElementById('btnQuit');
