@@ -1,0 +1,12 @@
+{
+  "name": "陆乘风job",
+  "alias": "ask_lu_job",
+  "notes": "ask陆乘风任务",
+  "pinned": true,
+  "commands": [
+    {
+      "command": "ask lu about job",
+      "delay": 0
+    }
+  ]
+}
