@@ -709,8 +709,8 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
 }
 .chat-msg .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
 
-/* 脚本醒目通知：加粗，写入聊天/消息列表（无红底） */
-.chat-msg.script-notify {
+/* 机器人醒目通知：加粗，写入聊天/消息列表（无红底） */
+.chat-msg.bot-notify {
     background: #161b22;
     border-left: 3px solid #f0883e;
     color: #ffb454;
@@ -720,7 +720,7 @@ html, body { height: 100%; overflow: hidden; background: #0d1117; color: #d4dce7
     margin: 4px 0;
     line-height: 1.4;
 }
-.chat-msg.script-notify .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
+.chat-msg.bot-notify .chat-time { color: #6e7681; font-size: 11px; margin-right: 6px; }
 
 /* 空状态 */
 .empty-hint {

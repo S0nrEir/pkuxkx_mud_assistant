@@ -1,4 +1,4 @@
-"""Persistent script configuration and runtime service."""
+"""Persistent bot configuration and runtime service."""
 
 import asyncio
 import importlib.util
@@ -9,26 +9,27 @@ import time
 import traceback
 
 
-SCRIPT_DIR = os.path.join(os.path.dirname(__file__), 'scripts')
-SCRIPT_INDEX = os.path.join(SCRIPT_DIR, 'index.json')
+# 机器人脚本文件存放在 scripts/ 目录下（沿用既有物理目录，避免破坏现有脚本与外部引用）。
+BOT_DIR = os.path.join(os.path.dirname(__file__), 'scripts')
+BOT_INDEX = os.path.join(BOT_DIR, 'index.json')
 _CLEAN_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[[0-9]*z|<[^>]+>')
 _SAFE_ID_RE = re.compile(r'[^\w\u4e00-\u9fff.-]+', flags=re.UNICODE)
 
 
-class ScriptConfigService:
-    """File-backed service for script index CRUD operations."""
+class BotConfigService:
+    """File-backed service for bot index CRUD operations."""
 
-    def __init__(self, script_dir=None, index_path=None):
-        self.script_dir = script_dir or SCRIPT_DIR
-        self.index_path = index_path or SCRIPT_INDEX
+    def __init__(self, bot_dir=None, index_path=None):
+        self.bot_dir = bot_dir or BOT_DIR
+        self.index_path = index_path or BOT_INDEX
 
     def safe_id(self, name):
         name = str(name or '').strip()
         slug = _SAFE_ID_RE.sub('_', name).strip('._')
-        return slug or 'script'
+        return slug or 'bot'
 
     def _default_index(self):
-        return {'scripts': []}
+        return {'bots': []}
 
     def _read_index(self):
         if not os.path.exists(self.index_path):
@@ -38,7 +39,7 @@ class ScriptConfigService:
         return data if isinstance(data, dict) else self._default_index()
 
     def _write_index(self, data):
-        os.makedirs(self.script_dir, exist_ok=True)
+        os.makedirs(self.bot_dir, exist_ok=True)
         with open(self.index_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -53,13 +54,13 @@ class ScriptConfigService:
     def validate(self, config):
         config = self.normalize(config)
         if not config['name']:
-            raise ValueError('必须填写脚本名称')
+            raise ValueError('必须填写机器人名称')
         if not config['path']:
-            raise ValueError('必须填写脚本路径')
+            raise ValueError('必须填写机器人脚本路径')
         if self._is_unsafe_path(config['path']):
-            raise ValueError('脚本路径必须位于 scripts 目录内')
+            raise ValueError('机器人脚本路径必须位于 scripts 目录内')
         if not config['path'].endswith('.py'):
-            raise ValueError('脚本路径必须是 .py 文件')
+            raise ValueError('机器人脚本路径必须是 .py 文件')
         return config
 
     @staticmethod
@@ -75,35 +76,35 @@ class ScriptConfigService:
     def resolve_script_path(self, path):
         safe_path = str(path or '').replace('\\', '/')
         if self._is_unsafe_path(safe_path):
-            raise ValueError('脚本路径必须位于 scripts 目录内')
-        full_path = os.path.abspath(os.path.join(self.script_dir, safe_path))
-        root = os.path.abspath(self.script_dir)
+            raise ValueError('机器人脚本路径必须位于 scripts 目录内')
+        full_path = os.path.abspath(os.path.join(self.bot_dir, safe_path))
+        root = os.path.abspath(self.bot_dir)
         if os.path.commonpath([root, full_path]) != root:
-            raise ValueError('脚本路径必须位于 scripts 目录内')
+            raise ValueError('机器人脚本路径必须位于 scripts 目录内')
         return full_path
 
-    def save(self, config, script_id=None):
+    def save(self, config, bot_id=None):
         config = self.validate(config)
         data = self._read_index()
-        scripts = data.get('scripts') if isinstance(data.get('scripts'), list) else []
-        old_id = self.safe_id(script_id) if script_id else ''
+        bots = data.get('bots') if isinstance(data.get('bots'), list) else []
+        old_id = self.safe_id(bot_id) if bot_id else ''
         new_id = self.safe_id(config['name'])
         found = False
         normalized = {'id': new_id, **config}
-        next_scripts = []
-        for item in scripts:
+        next_bots = []
+        for item in bots:
             item_id = self.safe_id((item or {}).get('id') or (item or {}).get('name'))
             if old_id and item_id == old_id:
                 if not found:
-                    next_scripts.append(normalized)
+                    next_bots.append(normalized)
                     found = True
                 continue
             if item_id == new_id:
                 continue
-            next_scripts.append(self._normalize_index_item(item))
+            next_bots.append(self._normalize_index_item(item))
         if not found:
-            next_scripts.append(normalized)
-        data['scripts'] = next_scripts
+            next_bots.append(normalized)
+        data['bots'] = next_bots
         self._write_index(data)
         return new_id, config
 
@@ -113,29 +114,29 @@ class ScriptConfigService:
         config = self.normalize(item)
         return {'id': item_id, **config}
 
-    def load(self, script_id):
-        script_id = self.safe_id(script_id)
+    def load(self, bot_id):
+        bot_id = self.safe_id(bot_id)
         for item in self.list():
-            if item['id'] == script_id:
+            if item['id'] == bot_id:
                 return item['config']
-        raise FileNotFoundError(script_id)
+        raise FileNotFoundError(bot_id)
 
-    def delete(self, script_id):
-        script_id = self.safe_id(script_id)
+    def delete(self, bot_id):
+        bot_id = self.safe_id(bot_id)
         data = self._read_index()
-        scripts = data.get('scripts') if isinstance(data.get('scripts'), list) else []
-        data['scripts'] = [
+        bots = data.get('bots') if isinstance(data.get('bots'), list) else []
+        data['bots'] = [
             self._normalize_index_item(item)
-            for item in scripts
-            if self.safe_id((item or {}).get('id') or (item or {}).get('name')) != script_id
+            for item in bots
+            if self.safe_id((item or {}).get('id') or (item or {}).get('name')) != bot_id
         ]
         self._write_index(data)
 
     def list(self):
         data = self._read_index()
-        scripts = data.get('scripts') if isinstance(data.get('scripts'), list) else []
+        bots = data.get('bots') if isinstance(data.get('bots'), list) else []
         items = []
-        for raw in scripts:
+        for raw in bots:
             item = self._normalize_index_item(raw)
             config = {'name': item['name'], 'notes': item['notes'], 'path': item['path']}
             exists = False
@@ -153,8 +154,8 @@ class ScriptConfigService:
         return items
 
 
-class ScriptTools:
-    """Helpers passed into custom scripts."""
+class BotTools:
+    """Helpers passed into custom bots."""
 
     def __init__(self, send_command=None, runtime_log=None, notify=None):
         self._send_command = send_command
@@ -188,12 +189,12 @@ class ScriptTools:
         await asyncio.sleep(max(0, seconds))
 
     def log(self, message):
-        self._runtime_log(f'[SCRIPT] {message}')
+        self._runtime_log(f'[BOT] {message}')
 
     def notify(self, message):
         """在网页消息列表输出一条醒目的大号加粗消息。
 
-        和 send 一样，实际推送由运行时注入的回调完成，脚本只需调用
+        和 send 一样，实际推送由运行时注入的回调完成，机器人脚本只需调用
         tools.notify('要显示的文本')。
         """
         try:
@@ -205,9 +206,9 @@ class ScriptTools:
         return time.time()
 
 
-class ScriptRuntime:
+class BotRuntime:
     def __init__(self, config_service=None, runtime_log=None, send_command=None, notify=None):
-        self.config_service = config_service or default_script_service
+        self.config_service = config_service or default_bot_service
         self.runtime_log = runtime_log or (lambda msg: None)
         self.send_command = send_command
         self.notify = notify or (lambda message: None)
@@ -232,28 +233,28 @@ class ScriptRuntime:
                     close = getattr(result, 'close', None)
                     if callable(close):
                         close()
-                    self.runtime_log('[SCRIPT] 异步清理需要在事件循环中执行，已跳过')
+                    self.runtime_log('[BOT] 异步清理需要在事件循环中执行，已跳过')
         except Exception:
-            self.runtime_log('[SCRIPT] 清理失败:\n' + traceback.format_exc())
+            self.runtime_log('[BOT] 清理失败:\n' + traceback.format_exc())
 
-    def load(self, script_id, config=None):
-        script_id = self.config_service.safe_id(script_id)
-        source_config = config if config is not None else self.config_service.load(script_id)
+    def load(self, bot_id, config=None):
+        bot_id = self.config_service.safe_id(bot_id)
+        source_config = config if config is not None else self.config_service.load(bot_id)
         loaded_config = self.config_service.normalize(source_config)
         script_path = self.config_service.resolve_script_path(loaded_config['path'])
         if not os.path.exists(script_path):
             raise FileNotFoundError(script_path)
-        module_name = f'mud_user_script_{script_id}_{int(time.time() * 1000)}'
+        module_name = f'mud_user_bot_{bot_id}_{int(time.time() * 1000)}'
         spec = importlib.util.spec_from_file_location(module_name, script_path)
         if not spec or not spec.loader:
-            raise ImportError(f'无法加载脚本模块: {script_path}')
+            raise ImportError(f'无法加载机器人模块: {script_path}')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         handler = getattr(module, 'handle_message', None)
         if not callable(handler):
-            raise ValueError('脚本必须实现 handle_message(message, tools) 接口')
+            raise ValueError('机器人脚本必须实现 handle_message(message, tools) 接口')
         self._cleanup_module(self.module)
-        self.active_id = script_id
+        self.active_id = bot_id
         self.config = loaded_config
         self.module = module
         return loaded_config
@@ -267,7 +268,7 @@ class ScriptRuntime:
     async def handle_message(self, message):
         if not self.active:
             return
-        tools = ScriptTools(
+        tools = BotTools(
             send_command=self.send_command,
             runtime_log=self.runtime_log,
             notify=self.notify,
@@ -278,23 +279,23 @@ class ScriptRuntime:
             if hasattr(result, '__await__'):
                 await result
         except Exception:
-            self.runtime_log('[SCRIPT] 执行失败:\n' + traceback.format_exc())
+            self.runtime_log('[BOT] 执行失败:\n' + traceback.format_exc())
 
 
-default_script_service = ScriptConfigService()
+default_bot_service = BotConfigService()
 
 
 def list_configs():
-    return default_script_service.list()
+    return default_bot_service.list()
 
 
-def save_config(config, script_id=None):
-    return default_script_service.save(config, script_id)
+def save_config(config, bot_id=None):
+    return default_bot_service.save(config, bot_id)
 
 
-def load_config(script_id):
-    return default_script_service.load(script_id)
+def load_config(bot_id):
+    return default_bot_service.load(bot_id)
 
 
-def delete_config(script_id):
-    return default_script_service.delete(script_id)
+def delete_config(bot_id):
+    return default_bot_service.delete(bot_id)
