@@ -15,12 +15,12 @@ from quick_commands import (
     list_configs as list_quick_command_configs,
     save_config as save_quick_command_config,
 )
-from bot_system import (
-    BotRuntime,
-    delete_config as delete_bot_config,
-    list_configs as list_bot_configs,
-    load_config as load_bot_config,
-    save_config as save_bot_config,
+from script_system import (
+    ScriptRuntime,
+    delete_config as delete_script_config,
+    list_configs as list_script_configs,
+    load_config as load_script_config,
+    save_config as save_script_config,
 )
 from triggers import TriggerRuntime, delete_config, list_configs, load_config, save_config
 
@@ -71,12 +71,12 @@ class MudSession:
         self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
-        self.bots = BotRuntime(
+        self.scripts = ScriptRuntime(
             runtime_log=self.runtime_log,
-            send_command=self._send_bot_command,
-            notify=self._send_bot_notify,
+            send_command=self._send_script_command,
+            notify=self._send_script_notify,
         )
-        self._bot_lock = asyncio.Lock()
+        self._script_lock = asyncio.Lock()
         self._trigger_lock = asyncio.Lock()
         self._trigger_tasks = set()
         self._trigger_queue = []
@@ -274,14 +274,14 @@ class MudSession:
             'active': self.triggers.active,
         })
 
-    async def _send_bot_command(self, command):
-        await self._send_mud_command(command, event_type='bot_event', track_trigger=False)
+    async def _send_script_command(self, command):
+        await self._send_mud_command(command, event_type='script_event', track_trigger=False)
         self._add_history(str(command or '').strip())
 
-    def _send_bot_notify(self, message):
-        """把机器人要醒目显示的消息推送到网页消息列表（聊天面板）。"""
+    def _send_script_notify(self, message):
+        """把脚本要醒目显示的消息推送到网页消息列表（聊天面板）。"""
         payload = {
-            'type': 'bot_notify',
+            'type': 'script_notify',
             'data': {
                 'time': datetime.now().strftime('%H:%M:%S'),
                 'text': str(message or ''),
@@ -402,12 +402,12 @@ class MudSession:
             payload['status'] = status
         await self._send_ws_json(payload)
 
-    async def _send_bot_list(self, status=''):
+    async def _send_script_list(self, status=''):
         payload = {
-            'type': 'bot_list',
-            'items': list_bot_configs(),
-            'active_id': self.bots.active_id,
-            'active': self.bots.active,
+            'type': 'script_list',
+            'items': list_script_configs(),
+            'active_id': self.scripts.active_id,
+            'active': self.scripts.active,
         }
         if status:
             payload['status'] = status
@@ -504,7 +504,7 @@ class MudSession:
             return
 
         if action == 'load':
-            if self.bots.active:
+            if self.scripts.active:
                 await self._send_ws_json({
                     'type': 'trigger_status',
                     'ok': False,
@@ -527,7 +527,7 @@ class MudSession:
                 'active': True,
             })
             await self._send_trigger_list()
-            await self._send_bot_list()
+            await self._send_script_list()
             return
 
         if action == 'delete':
@@ -550,92 +550,92 @@ class MudSession:
             })
             await self._send_trigger_list()
 
-    async def _handle_bot_ws(self, msg):
+    async def _handle_script_ws(self, msg):
         action = msg.get('action')
         if action == 'list':
-            await self._send_bot_list()
+            await self._send_script_list()
             return
 
         if action == 'save':
             reload_active = False
             try:
                 original_id = msg.get('id') or ''
-                was_active = bool(original_id and self.bots.active_id == original_id)
-                bot_id, config_data = save_bot_config(msg.get('config') or {}, original_id)
-                reload_active = was_active or self.bots.active_id == bot_id
+                was_active = bool(original_id and self.scripts.active_id == original_id)
+                script_id, config_data = save_script_config(msg.get('config') or {}, original_id)
+                reload_active = was_active or self.scripts.active_id == script_id
                 if reload_active:
-                    self.bots.load(bot_id, config_data)
+                    self.scripts.load(script_id, config_data)
             except ValueError as e:
-                await self._send_ws_json({'type': 'bot_status', 'ok': False, 'status': f'保存失败：{e}'})
+                await self._send_ws_json({'type': 'script_status', 'ok': False, 'status': f'保存失败：{e}'})
                 return
             except Exception as e:
                 if reload_active:
-                    self.bots.stop()
-                await self._send_ws_json({'type': 'bot_status', 'ok': False, 'status': f'保存成功，但加载失败：{e}'})
-                await self._send_bot_list()
+                    self.scripts.stop()
+                await self._send_ws_json({'type': 'script_status', 'ok': False, 'status': f'保存成功，但加载失败：{e}'})
+                await self._send_script_list()
                 return
             payload = {
-                'type': 'bot_status',
+                'type': 'script_status',
                 'ok': True,
-                'status': '已保存机器人配置',
-                'id': bot_id,
+                'status': '已保存脚本配置',
+                'id': script_id,
                 'config': config_data,
             }
-            if self.bots.active_id == bot_id:
+            if self.scripts.active_id == script_id:
                 payload['active'] = True
             await self._send_ws_json(payload)
-            await self._send_bot_list()
+            await self._send_script_list()
             return
 
         if action == 'load':
             if self.triggers.active:
                 await self._send_ws_json({
-                    'type': 'bot_status',
+                    'type': 'script_status',
                     'ok': False,
                     'status': '触发器正在启用，请先停用触发器再启用机器人',
                 })
                 return
             try:
-                bot_id = msg.get('id') or ''
-                config_data = self.bots.load(bot_id, load_bot_config(bot_id))
+                script_id = msg.get('id') or ''
+                config_data = self.scripts.load(script_id, load_script_config(script_id))
             except Exception as e:
-                await self._send_ws_json({'type': 'bot_status', 'ok': False, 'status': f'加载失败：{e}'})
+                await self._send_ws_json({'type': 'script_status', 'ok': False, 'status': f'加载失败：{e}'})
                 return
             await self._send_ws_json({
-                'type': 'bot_status',
+                'type': 'script_status',
                 'ok': True,
                 'status': '已启用机器人',
-                'id': self.bots.active_id,
+                'id': self.scripts.active_id,
                 'config': config_data,
                 'active': True,
             })
-            await self._send_bot_list()
+            await self._send_script_list()
             await self._send_trigger_list()
             return
 
         if action == 'delete':
-            bot_id = msg.get('id') or ''
-            if self.bots.active_id == bot_id:
-                self.bots.stop()
-            delete_bot_config(bot_id)
-            await self._send_bot_list('已删除机器人配置')
+            script_id = msg.get('id') or ''
+            if self.scripts.active_id == script_id:
+                self.scripts.stop()
+            delete_script_config(script_id)
+            await self._send_script_list('已删除脚本配置')
             return
 
         if action == 'stop':
-            self.bots.stop()
+            self.scripts.stop()
             await self._send_ws_json({
-                'type': 'bot_status',
+                'type': 'script_status',
                 'ok': True,
                 'status': '已停用机器人',
                 'active': False,
             })
-            await self._send_bot_list()
+            await self._send_script_list()
 
-    async def _handle_bot_text(self, text):
-        if not self.bots.active:
+    async def _handle_script_text(self, text):
+        if not self.scripts.active:
             return
-        async with self._bot_lock:
-            await self.bots.handle_message(text)
+        async with self._script_lock:
+            await self.scripts.handle_message(text)
 
     async def _handle_trigger_text(self, text):
         if self._trigger_waiting_response:
@@ -725,7 +725,7 @@ class MudSession:
 
             # 2. 累积到原始字节缓冲区
             self._raw_buf.extend(clean)
-            bot_messages = []
+            script_messages = []
 
             # 3. 按行分割：只解码完整的行（以 \n 结尾）
             #    这样不会在 GBK 字符中间截断
@@ -814,7 +814,7 @@ class MudSession:
                         self._minimap_active = False
                         self._minimap_lines = []
 
-                bot_messages.append(line_text)
+                script_messages.append(line_text)
 
             # 4. 处理缓冲区中剩余的不完整行（提示符等，无 \n 结尾）
             if self._raw_buf:
@@ -836,7 +836,7 @@ class MudSession:
                     self._log_data(text, 'recv')
                     await self._append_character_capture(text)
                     await self._handle_trigger_text(text)
-                    bot_messages.append(text)
+                    script_messages.append(text)
 
                     # 检测编码选择提示
                     if 'Input 1 for GBK' in text:
@@ -863,8 +863,8 @@ class MudSession:
                         await self.writer.drain()
 
             await self._finish_trigger_response()
-            for bot_text in bot_messages:
-                await self._handle_bot_text(bot_text)
+            for script_text in script_messages:
+                await self._handle_script_text(script_text)
 
     # ─── 读取浏览器 WebSocket ───
     async def _read_ws_loop(self):
@@ -915,8 +915,8 @@ class MudSession:
                         await self._handle_trigger_ws(j)
                     elif j.get('type') == 'quick_command':
                         await self._handle_quick_command_ws(j)
-                    elif j.get('type') == 'bot':
-                        await self._handle_bot_ws(j)
+                    elif j.get('type') == 'script':
+                        await self._handle_script_ws(j)
                     elif j.get('type') == 'quit_game':
                         self._quit_pending = True
                         self.writer.write(b'save\r\n')

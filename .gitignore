@@ -2,3 +2,6 @@
 .claude
 .zcode
 _search_result.txt
+__pycache__/
+*.py[cod]
+*$py.class

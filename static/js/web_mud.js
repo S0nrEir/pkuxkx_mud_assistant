@@ -85,19 +85,19 @@
     const triggerSaveBtn = document.getElementById('triggerSaveBtn');
     const triggerStopBtn = document.getElementById('triggerStopBtn');
     const triggerStatusEl = document.getElementById('triggerStatus');
-    const botCurrentNameEl = document.getElementById('botCurrentName');
-    const botDetailEl = document.getElementById('botDetail');
-    const botListEl = document.getElementById('botList');
-    const botLoadBtn = document.getElementById('botLoadBtn');
-    const botNewBtn = document.getElementById('botNewBtn');
-    const botCopyBtn = document.getElementById('botCopyBtn');
-    const botSaveBtn = document.getElementById('botSaveBtn');
-    const botStopBtn = document.getElementById('botStopBtn');
-    const botDeleteBtn = document.getElementById('botDeleteBtn');
-    const botStatusEl = document.getElementById('botStatus');
-    const botNameEl = document.getElementById('botName');
-    const botPathEl = document.getElementById('botPath');
-    const botNotesEl = document.getElementById('botNotes');
+    const scriptCurrentNameEl = document.getElementById('scriptCurrentName');
+    const scriptDetailEl = document.getElementById('scriptDetail');
+    const scriptListEl = document.getElementById('scriptList');
+    const scriptLoadBtn = document.getElementById('scriptLoadBtn');
+    const scriptNewBtn = document.getElementById('scriptNewBtn');
+    const scriptCopyBtn = document.getElementById('scriptCopyBtn');
+    const scriptSaveBtn = document.getElementById('scriptSaveBtn');
+    const scriptStopBtn = document.getElementById('scriptStopBtn');
+    const scriptDeleteBtn = document.getElementById('scriptDeleteBtn');
+    const scriptStatusEl = document.getElementById('scriptStatus');
+    const scriptNameEl = document.getElementById('scriptName');
+    const scriptPathEl = document.getElementById('scriptPath');
+    const scriptNotesEl = document.getElementById('scriptNotes');
     const quickCommandButtonsEl = document.getElementById('quickCommandButtons');
     const characterStatePanelEl = document.getElementById('characterStatePanel');
     const inventoryStatePanelEl = document.getElementById('inventoryStatePanel');
@@ -119,9 +119,9 @@
     let triggerItems = [];
     let selectedTriggerId = '';
     let activeTriggerId = '';
-    let botItems = [];
-    let selectedBotId = '';
-    let activeBotId = '';
+    let scriptItems = [];
+    let selectedScriptId = '';
+    let activeScriptId = '';
     let quickCommandItems = [];
     let selectedQuickCommandId = '';
     let selectedQuickCommandPinned = true;
@@ -317,7 +317,7 @@
             cmdInput.focus();
             syncMutedToBackend();
             sendTriggerMessage('list');
-            sendBotMessage('list');
+            sendScriptMessage('list');
             loadQuickCommands();
             loadCharacterState();
         };
@@ -346,14 +346,14 @@
                         handleTriggerStatus(msg);
                     } else if (msg.type === 'trigger_event') {
                         handleTriggerEvent(msg);
-                    } else if (msg.type === 'bot_list') {
-                        handleBotList(msg);
-                    } else if (msg.type === 'bot_status') {
-                        handleBotStatus(msg);
-                    } else if (msg.type === 'bot_event') {
-                        handleBotEvent(msg);
-                    } else if (msg.type === 'bot_notify') {
-                        addBotNotify(msg.data);
+                    } else if (msg.type === 'script_list') {
+                        handleScriptList(msg);
+                    } else if (msg.type === 'script_status') {
+                        handleScriptStatus(msg);
+                    } else if (msg.type === 'script_event') {
+                        handleScriptEvent(msg);
+                    } else if (msg.type === 'script_notify') {
+                        addScriptNotify(msg.data);
                     } else if (msg.type === 'quick_command_list') {
                         handleQuickCommandList(msg);
                     } else if (msg.type === 'quick_command_status') {
@@ -1022,14 +1022,14 @@
         chatPanelEl.scrollTop = chatPanelEl.scrollHeight;
     }
 
-    // ─── 机器人醒目通知（大号加粗，红底，写入消息列表） ───
-    function addBotNotify(data) {
+    // ─── 脚本醒目通知（大号加粗，红底，写入消息列表） ───
+    function addScriptNotify(data) {
         if (!chatInitialized) {
             chatPanelEl.innerHTML = '';
             chatInitialized = true;
         }
         const div = document.createElement('div');
-        div.className = 'chat-msg bot-notify';
+        div.className = 'chat-msg script-notify';
         div.innerHTML = '<span class="chat-time">' + escapeHtml((data && data.time) || '') + '</span>' + escapeHtml((data && data.text) || '');
         chatPanelEl.appendChild(div);
         while (chatPanelEl.children.length > 200) {
@@ -1365,26 +1365,26 @@
 
     function handleTriggerList(msg) {
         activeTriggerId = msg.active_id || '';
-        if (activeTriggerId) activeBotId = '';
+        if (activeTriggerId) activeScriptId = '';
         renderTriggerList(msg.items || []);
         if (activeTriggerId && !selectedTriggerId) selectedTriggerId = activeTriggerId;
         if (selectedTriggerId) selectTrigger(selectedTriggerId);
         if (msg.status) setTriggerStatus(msg.status, 'ok');
-        updateActiveBotDisplay();
+        updateActiveScriptDisplay();
     }
 
     function handleTriggerStatus(msg) {
         if (msg.config) fillTriggerForm(msg.config);
         if (msg.id && msg.active) {
             activeTriggerId = msg.id;
-            activeBotId = '';
+            activeScriptId = '';
         }
         if (msg.active === false) activeTriggerId = '';
         if (msg.id) selectedTriggerId = msg.id;
         if (msg.status) setTriggerStatus(msg.status, msg.ok === false ? 'error' : 'ok');
         if (msg.ok === false && msg.status) alert(msg.status);
-        if (activeBotId) {
-            updateActiveBotDisplay();
+        if (activeScriptId) {
+            updateActiveScriptDisplay();
         } else if (msg.active === false) {
             setActiveTriggerDisplay('无');
         } else if (msg.id && msg.active && msg.config) {
@@ -1402,61 +1402,61 @@
     }
 
     // ─── 机器人 ───
-    function setBotStatus(text, kind) {
-        botStatusEl.textContent = text || '';
-        botStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
-        botStatusEl.classList.remove('flash');
-        void botStatusEl.offsetWidth;
-        botStatusEl.classList.add('flash');
+    function setScriptStatus(text, kind) {
+        scriptStatusEl.textContent = text || '';
+        scriptStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
+        scriptStatusEl.classList.remove('flash');
+        void scriptStatusEl.offsetWidth;
+        scriptStatusEl.classList.add('flash');
     }
 
-    function sendBotMessage(action, data) {
+    function sendScriptMessage(action, data) {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
-            setBotStatus('未连接，无法操作', 'error');
+            setScriptStatus('未连接，无法操作', 'error');
             return false;
         }
-        ws.send(JSON.stringify(Object.assign({ type: 'bot', action: action }, data || {})));
+        ws.send(JSON.stringify(Object.assign({ type: 'script', action: action }, data || {})));
         return true;
     }
 
-    function clearBotForm() {
-        botNameEl.value = '';
-        botPathEl.value = '';
-        botNotesEl.value = '';
-        botCurrentNameEl.textContent = activeBotId || '无';
+    function clearScriptForm() {
+        scriptNameEl.value = '';
+        scriptPathEl.value = '';
+        scriptNotesEl.value = '';
+        scriptCurrentNameEl.textContent = activeScriptId || '无';
     }
 
-    function startNewBot() {
-        selectedBotId = '';
-        clearBotForm();
-        botDetailEl.textContent = '正在新建机器人配置';
-        botLoadBtn.disabled = true;
-        botDeleteBtn.disabled = true;
-        botCopyBtn.disabled = true;
-        botListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+    function startNewScript() {
+        selectedScriptId = '';
+        clearScriptForm();
+        scriptDetailEl.textContent = '正在新建脚本配置';
+        scriptLoadBtn.disabled = true;
+        scriptDeleteBtn.disabled = true;
+        scriptCopyBtn.disabled = true;
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el) {
             el.classList.remove('active');
         });
-        setBotStatus('正在新建机器人配置', 'ok');
-        botNameEl.focus();
+        setScriptStatus('正在新建脚本配置', 'ok');
+        scriptNameEl.focus();
     }
 
-    function fillBotForm(config) {
+    function fillScriptForm(config) {
         config = config || {};
-        botNameEl.value = config.name || '';
-        botPathEl.value = config.path || '';
-        botNotesEl.value = config.notes || '';
+        scriptNameEl.value = config.name || '';
+        scriptPathEl.value = config.path || '';
+        scriptNotesEl.value = config.notes || '';
     }
 
-    function getBotFormConfig() {
+    function getScriptFormConfig() {
         return {
-            name: botNameEl.value.trim(),
-            path: botPathEl.value.trim(),
-            notes: botNotesEl.value,
+            name: scriptNameEl.value.trim(),
+            path: scriptPathEl.value.trim(),
+            notes: scriptNotesEl.value,
         };
     }
 
-    function formatBotDetail(item) {
-        if (!item || !item.config) return '选择一个机器人查看详情';
+    function formatScriptDetail(item) {
+        if (!item || !item.config) return '选择一个脚本查看详情';
         const config = item.config;
         const lines = [
             '名称: ' + (config.name || ''),
@@ -1469,88 +1469,88 @@
         return lines.join('\n');
     }
 
-    function updateActiveBotDisplay() {
-        var item = botItems.find(function(x) { return x.id === activeBotId; });
-        botCurrentNameEl.textContent = activeBotId ? ((item && item.name) || activeBotId) : '无';
-        if (activeBotId) {
-            toolbarTriggerCurrentNameEl.textContent = '机器人：' + ((item && item.name) || activeBotId);
+    function updateActiveScriptDisplay() {
+        var item = scriptItems.find(function(x) { return x.id === activeScriptId; });
+        scriptCurrentNameEl.textContent = activeScriptId ? ((item && item.name) || activeScriptId) : '无';
+        if (activeScriptId) {
+            toolbarTriggerCurrentNameEl.textContent = '脚本：' + ((item && item.name) || activeScriptId);
         } else {
             updateActiveTriggerDisplay();
         }
     }
 
-    function renderBotList(items) {
-        botItems = items || [];
-        updateActiveBotDisplay();
-        if (!botItems.length) {
-            botListEl.innerHTML = '<div class="empty-hint">暂无机器人配置</div>';
-            botDetailEl.textContent = '选择一个机器人查看详情';
-            botLoadBtn.disabled = true;
-            botDeleteBtn.disabled = true;
-            botCopyBtn.disabled = true;
-            selectedBotId = '';
+    function renderScriptList(items) {
+        scriptItems = items || [];
+        updateActiveScriptDisplay();
+        if (!scriptItems.length) {
+            scriptListEl.innerHTML = '<div class="empty-hint">暂无脚本配置</div>';
+            scriptDetailEl.textContent = '选择一个脚本查看详情';
+            scriptLoadBtn.disabled = true;
+            scriptDeleteBtn.disabled = true;
+            scriptCopyBtn.disabled = true;
+            selectedScriptId = '';
             return;
         }
-        botListEl.innerHTML = botItems.map(function(item) {
+        scriptListEl.innerHTML = scriptItems.map(function(item) {
             var cls = '';
-            if (item.id === activeBotId) cls += ' loaded';
-            if (item.id === selectedBotId) cls += ' active';
+            if (item.id === activeScriptId) cls += ' loaded';
+            if (item.id === selectedScriptId) cls += ' active';
             if (!item.exists) cls += ' missing';
-            var badge = item.id === activeBotId ? '<span class="trigger-loaded-badge">已启用</span>' : '';
+            var badge = item.id === activeScriptId ? '<span class="trigger-loaded-badge">已启用</span>' : '';
             var existsText = item.exists ? '文件存在' : '文件未找到';
             return '<div class="trigger-item' + cls + '" data-id="' + escapeAttr(item.id) + '">' +
                 '<div class="trigger-item-title"><span class="trigger-item-name">' + escapeHtml(item.name || item.id) + '</span>' + badge + '</div>' +
                 '<div class="trigger-item-meta">' + escapeHtml(item.path || '') + ' · ' + existsText + '</div>' +
                 '</div>';
         }).join('');
-        botListEl.querySelectorAll('.trigger-item').forEach(function(el, index) {
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el, index) {
             el.classList.add('list-enter');
             el.style.animationDelay = Math.min(index * 18, 180) + 'ms';
         });
-        botLoadBtn.disabled = !selectedBotId || (selectedBotId === activeBotId);
+        scriptLoadBtn.disabled = !selectedScriptId || (selectedScriptId === activeScriptId);
     }
 
-    function selectBot(id) {
-        selectedBotId = id || '';
-        var item = botItems.find(function(x) { return x.id === selectedBotId; });
-        botDetailEl.textContent = formatBotDetail(item);
-        botDetailEl.classList.remove('flash');
-        void botDetailEl.offsetWidth;
-        botDetailEl.classList.add('flash');
-        if (item && item.config) fillBotForm(item.config);
-        botDeleteBtn.disabled = !item;
-        botLoadBtn.disabled = !item || (selectedBotId === activeBotId);
-        botCopyBtn.disabled = !item;
-        botListEl.querySelectorAll('.trigger-item').forEach(function(el) {
-            el.classList.toggle('active', el.getAttribute('data-id') === selectedBotId);
+    function selectScript(id) {
+        selectedScriptId = id || '';
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
+        scriptDetailEl.textContent = formatScriptDetail(item);
+        scriptDetailEl.classList.remove('flash');
+        void scriptDetailEl.offsetWidth;
+        scriptDetailEl.classList.add('flash');
+        if (item && item.config) fillScriptForm(item.config);
+        scriptDeleteBtn.disabled = !item;
+        scriptLoadBtn.disabled = !item || (selectedScriptId === activeScriptId);
+        scriptCopyBtn.disabled = !item;
+        scriptListEl.querySelectorAll('.trigger-item').forEach(function(el) {
+            el.classList.toggle('active', el.getAttribute('data-id') === selectedScriptId);
         });
     }
 
-    function handleBotList(msg) {
-        activeBotId = msg.active_id || '';
-        renderBotList(msg.items || []);
-        if (activeBotId && !selectedBotId) selectedBotId = activeBotId;
-        if (selectedBotId) selectBot(selectedBotId);
-        if (msg.status) setBotStatus(msg.status, 'ok');
-        if (activeBotId) activeTriggerId = '';
+    function handleScriptList(msg) {
+        activeScriptId = msg.active_id || '';
+        renderScriptList(msg.items || []);
+        if (activeScriptId && !selectedScriptId) selectedScriptId = activeScriptId;
+        if (selectedScriptId) selectScript(selectedScriptId);
+        if (msg.status) setScriptStatus(msg.status, 'ok');
+        if (activeScriptId) activeTriggerId = '';
     }
 
-    function handleBotStatus(msg) {
-        if (msg.config) fillBotForm(msg.config);
+    function handleScriptStatus(msg) {
+        if (msg.config) fillScriptForm(msg.config);
         if (msg.id && msg.active) {
-            activeBotId = msg.id;
+            activeScriptId = msg.id;
             activeTriggerId = '';
         }
-        if (msg.active === false) activeBotId = '';
-        if (msg.id) selectedBotId = msg.id;
-        if (msg.status) setBotStatus(msg.status, msg.ok === false ? 'error' : 'ok');
+        if (msg.active === false) activeScriptId = '';
+        if (msg.id) selectedScriptId = msg.id;
+        if (msg.status) setScriptStatus(msg.status, msg.ok === false ? 'error' : 'ok');
         if (msg.ok === false && msg.status) alert(msg.status);
-        updateActiveBotDisplay();
-        renderBotList(botItems);
-        if (selectedBotId) selectBot(selectedBotId);
+        updateActiveScriptDisplay();
+        renderScriptList(scriptItems);
+        if (selectedScriptId) selectScript(selectedScriptId);
     }
 
-    function handleBotEvent(msg) {
+    function handleScriptEvent(msg) {
         if (msg.command) showSentCommand(msg.command);
     }
 
@@ -2416,7 +2416,7 @@
             void btn.offsetWidth;
             btn.classList.add('tab-hit');
             if (pageId === 'triggerPage') sendTriggerMessage('list');
-            if (pageId === 'botPage') sendBotMessage('list');
+            if (pageId === 'scriptPage') sendScriptMessage('list');
             if (pageId === 'quickCommandPage') loadQuickCommands();
             if (pageId === 'gamePage') setTimeout(function() { fitAddon.fit(); }, 0);
         });
@@ -2446,7 +2446,7 @@
 
     triggerLoadBtn.addEventListener('click', function() {
         if (!selectedTriggerId) return;
-        if (activeBotId) {
+        if (activeScriptId) {
             const message = '机器人正在启用，请先停用机器人再启用触发器';
             setTriggerStatus(message, 'error');
             alert(message);
@@ -2506,65 +2506,65 @@
 
     clearTriggerForm();
 
-    botListEl.addEventListener('click', function(e) {
+    scriptListEl.addEventListener('click', function(e) {
         var item = e.target.closest('.trigger-item');
         if (!item) return;
         e.stopPropagation();
-        selectBot(item.getAttribute('data-id'));
+        selectScript(item.getAttribute('data-id'));
     });
 
-    botLoadBtn.addEventListener('click', function() {
-        if (!selectedBotId) return;
+    scriptLoadBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
         if (activeTriggerId) {
             const message = '触发器正在启用，请先停用触发器再启用机器人';
-            setBotStatus(message, 'error');
+            setScriptStatus(message, 'error');
             alert(message);
             return;
         }
-        sendBotMessage('load', { id: selectedBotId });
+        sendScriptMessage('load', { id: selectedScriptId });
     });
 
-    botNewBtn.addEventListener('click', function() {
-        startNewBot();
+    scriptNewBtn.addEventListener('click', function() {
+        startNewScript();
     });
 
-    botCopyBtn.addEventListener('click', function() {
-        if (!selectedBotId) return;
-        var item = botItems.find(function(x) { return x.id === selectedBotId; });
+    scriptCopyBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
         if (!item || !item.config) return;
         var copiedConfig = JSON.parse(JSON.stringify(item.config));
-        copiedConfig.name = (copiedConfig.name || selectedBotId) + '_副本';
-        sendBotMessage('save', { id: '', config: copiedConfig });
+        copiedConfig.name = (copiedConfig.name || selectedScriptId) + '_副本';
+        sendScriptMessage('save', { id: '', config: copiedConfig });
     });
 
-    botSaveBtn.addEventListener('click', function() {
-        const config = getBotFormConfig();
+    scriptSaveBtn.addEventListener('click', function() {
+        const config = getScriptFormConfig();
         if (!config.name) {
-            setBotStatus('必须填写机器人名称', 'error');
-            botNameEl.focus();
+            setScriptStatus('必须填写脚本名称', 'error');
+            scriptNameEl.focus();
             return;
         }
         if (!config.path) {
-            setBotStatus('必须填写机器人脚本路径', 'error');
-            botPathEl.focus();
+            setScriptStatus('必须填写脚本路径', 'error');
+            scriptPathEl.focus();
             return;
         }
-        sendBotMessage('save', { id: selectedBotId, config: config });
+        sendScriptMessage('save', { id: selectedScriptId, config: config });
     });
 
-    botStopBtn.addEventListener('click', function() {
-        sendBotMessage('stop');
+    scriptStopBtn.addEventListener('click', function() {
+        sendScriptMessage('stop');
     });
 
-    botDeleteBtn.addEventListener('click', function() {
-        if (!selectedBotId) return;
-        var item = botItems.find(function(x) { return x.id === selectedBotId; });
-        var name = item ? (item.name || item.id) : selectedBotId;
-        if (!confirm('确定要删除机器人配置「' + name + '」吗？')) return;
-        sendBotMessage('delete', { id: selectedBotId });
+    scriptDeleteBtn.addEventListener('click', function() {
+        if (!selectedScriptId) return;
+        var item = scriptItems.find(function(x) { return x.id === selectedScriptId; });
+        var name = item ? (item.name || item.id) : selectedScriptId;
+        if (!confirm('确定要删除脚本配置「' + name + '」吗？')) return;
+        sendScriptMessage('delete', { id: selectedScriptId });
     });
 
-    clearBotForm();
+    clearScriptForm();
 
     quickCommandButtonsEl.addEventListener('click', function(e) {
         var btn = e.target.closest('.quick-command-run');
