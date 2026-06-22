@@ -1401,7 +1401,7 @@
         if (msg.command) showSentCommand(msg.command);
     }
 
-    // ─── 脚本系统 ───
+    // ─── 机器人 ───
     function setScriptStatus(text, kind) {
         scriptStatusEl.textContent = text || '';
         scriptStatusEl.className = 'trigger-status' + (kind ? ' ' + kind : '');
@@ -2447,7 +2447,7 @@
     triggerLoadBtn.addEventListener('click', function() {
         if (!selectedTriggerId) return;
         if (activeScriptId) {
-            const message = '脚本系统正在启用，请先停用脚本系统再启用触发器';
+            const message = '机器人正在启用，请先停用机器人再启用触发器';
             setTriggerStatus(message, 'error');
             alert(message);
             return;
@@ -2516,7 +2516,7 @@
     scriptLoadBtn.addEventListener('click', function() {
         if (!selectedScriptId) return;
         if (activeTriggerId) {
-            const message = '触发器正在启用，请先停用触发器再启用脚本系统';
+            const message = '触发器正在启用，请先停用触发器再启用机器人';
             setScriptStatus(message, 'error');
             alert(message);
             return;

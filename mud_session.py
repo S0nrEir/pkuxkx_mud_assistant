@@ -508,7 +508,7 @@ class MudSession:
                 await self._send_ws_json({
                     'type': 'trigger_status',
                     'ok': False,
-                    'status': '脚本系统正在启用，请先停用脚本系统再启用触发器',
+                    'status': '机器人正在启用，请先停用机器人再启用触发器',
                 })
                 return
             try:
@@ -592,7 +592,7 @@ class MudSession:
                 await self._send_ws_json({
                     'type': 'script_status',
                     'ok': False,
-                    'status': '触发器正在启用，请先停用触发器再启用脚本系统',
+                    'status': '触发器正在启用，请先停用触发器再启用机器人',
                 })
                 return
             try:
@@ -604,7 +604,7 @@ class MudSession:
             await self._send_ws_json({
                 'type': 'script_status',
                 'ok': True,
-                'status': '已启用脚本系统',
+                'status': '已启用机器人',
                 'id': self.scripts.active_id,
                 'config': config_data,
                 'active': True,
@@ -626,7 +626,7 @@ class MudSession:
             await self._send_ws_json({
                 'type': 'script_status',
                 'ok': True,
-                'status': '已停用脚本系统',
+                'status': '已停用机器人',
                 'active': False,
             })
             await self._send_script_list()

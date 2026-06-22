@@ -14,7 +14,7 @@
         <div class="tab-buttons">
             <button class="tab-btn active" data-page="gamePage">游戏</button>
             <button class="tab-btn" id="btnTriggers" data-page="triggerPage">触发器</button>
-            <button class="tab-btn" id="btnScripts" data-page="scriptPage">脚本系统</button>
+            <button class="tab-btn" id="btnScripts" data-page="scriptPage">机器人</button>
             <button class="tab-btn" id="btnQuickCommands" data-page="quickCommandPage">快捷命令</button>
         </div>
         <div class="toolbar-trigger-current">当前自动化：<span id="toolbarTriggerCurrentName">无</span></div>
@@ -155,7 +155,7 @@
                     <button class="trigger-small-btn" id="scriptStopBtn">停用</button>
                     <button class="trigger-small-btn danger" id="scriptDeleteBtn" disabled>删除配置</button>
                 </div>
-                <div class="trigger-status" id="scriptStatus">未启用脚本系统</div>
+                <div class="trigger-status" id="scriptStatus">未启用机器人</div>
                 <div class="trigger-editor">
                     <div class="trigger-field">
                         <label for="scriptName">脚本名称</label>
@@ -171,7 +171,7 @@
                     </div>
                     <div class="trigger-field">
                         <label>脚本接口</label>
-                        <div class="trigger-tip">脚本文件放在 scripts 目录下，并实现 handle_message(message, tools)。脚本系统和触发器互斥，需要先停用当前自动化再启用另一个。</div>
+                        <div class="trigger-tip">脚本文件放在 scripts 目录下，并实现 handle_message(message, tools)。机器人和触发器互斥，需要先停用当前自动化再启用另一个。</div>
                     </div>
                 </div>
             </div>
