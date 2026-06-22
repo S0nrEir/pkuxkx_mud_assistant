@@ -15,8 +15,8 @@ from quick_commands import (
     list_configs as list_quick_command_configs,
     save_config as save_quick_command_config,
 )
-from script_system import (
-    ScriptRuntime,
+from bot_system import (
+    BotRuntime,
     delete_config as delete_script_config,
     list_configs as list_script_configs,
     load_config as load_script_config,
@@ -71,7 +71,7 @@ class MudSession:
         self._quit_pending = False    # 等待 save 回复后发 quit
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
-        self.scripts = ScriptRuntime(
+        self.scripts = BotRuntime(
             runtime_log=self.runtime_log,
             send_command=self._send_script_command,
             notify=self._send_script_notify,
