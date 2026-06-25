@@ -149,6 +149,10 @@
         term.writeln('\r\n\x1b[48;5;236m\x1b[38;5;220m\x1b[1m[CMD]\x1b[0m \x1b[38;5;220m' + visibleCmd + '\x1b[0m\r\n');
     }
 
+    function focusCommandInput() {
+        cmdInput.focus();
+    }
+
     function isCharacterStateCommand(cmd) {
         const parts = String(cmd || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
         if (parts.length !== 1) return false;
@@ -314,7 +318,7 @@
         ws.onopen = function() {
             setStatus(true);
             term.writeln('\x1b[32m[已连接到 MUD 服务器]\x1b[0m\r\n');
-            cmdInput.focus();
+            focusCommandInput();
             syncMutedToBackend();
             sendTriggerMessage('list');
             sendScriptMessage('list');
@@ -439,7 +443,7 @@
     scrollBottomBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         term.scrollToBottom();
-        cmdInput.focus();
+        focusCommandInput();
     });
 
     cmdInput.addEventListener('input', function() {
@@ -495,7 +499,7 @@
 
     // 点击终端区域时自动聚焦输入框
     document.getElementById('terminal').addEventListener('click', function() {
-        cmdInput.focus();
+        focusCommandInput();
     });
 
     // ═══ MXP 引擎 ═══
@@ -998,7 +1002,7 @@
         if (cmd && ws && ws.readyState === WebSocket.OPEN) {
             // 填入输入框并聚焦
             cmdInput.value = cmd;
-            cmdInput.focus();
+            focusCommandInput();
         }
     });
 
@@ -1702,7 +1706,7 @@
         savedDraft = '';
         cmdInput.value = '';
         hideQuickCommandSuggestions();
-        cmdInput.focus();
+        focusCommandInput();
         return true;
     }
 
@@ -1930,7 +1934,9 @@
 
     function executeQuickCommandById(id) {
         var item = quickCommandItems.find(function(x) { return x.id === id; });
-        executeQuickCommandItem(item);
+        var ok = executeQuickCommandItem(item);
+        focusCommandInput();
+        return ok;
     }
 
     function executeQuickCommandItem(item) {
