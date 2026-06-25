@@ -32,6 +32,8 @@ from starlette.staticfiles import StaticFiles
 _fullme_cookie_jar = http.cookiejar.CookieJar()
 _fullme_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_fullme_cookie_jar))
 
+import captcha_saver
+
 
 async def index_page(request):
     return HTMLResponse(load_html_page())
@@ -117,6 +119,31 @@ def _fetch_fullme_url(url):
         return resp.status, content_type, body, resp.geturl()
 
 
+def _capture_captcha_from_page(body, content_type, base_url):
+    """从 fullme 验证码页面 HTML 解析出真实验证码图片并下载保存。
+
+    fullme 的验证码直链 zmud/<fn>.jpg 实际是 404 的占位链接，真正的图嵌在
+    robot.php 页面里：<img src="./b2evo_captcha_tmp/b2evo_captcha_<hash>.jpg">。
+    页面被代理请求的瞬间这张图刚生成、必然有效，是最可靠的保存时机。
+    下载放后台线程，不阻塞代理响应。
+    """
+    try:
+        charset = 'utf-8'
+        m = re.search(r'charset=([^;\s]+)', content_type or '', re.I)
+        if m:
+            charset = m.group(1).strip('"')
+        try:
+            html_text = body.decode(charset, errors='replace')
+        except LookupError:
+            html_text = body.decode('utf-8', errors='replace')
+        img_url = captcha_saver.find_captcha_image_in_html(html_text, base_url)
+        if not img_url:
+            return
+        asyncio.create_task(asyncio.to_thread(captcha_saver.download_and_save, img_url))
+    except Exception as e:
+        _rt_log(f'验证码页面解析失败: {e}')
+
+
 async def fullme_proxy(request):
     url = request.query_params.get('url', '')
     if not _is_allowed_fullme_url(url):
@@ -136,7 +163,14 @@ async def fullme_proxy(request):
         return PlainTextResponse(f'fullme proxy error: {e}', status_code=502)
 
     if 'text/html' in (content_type or '').lower():
-        body = _rewrite_fullme_html(body, content_type, final_url or url)
+        base_url = final_url or url
+        # robot.php 页面里嵌着真正的验证码图(./b2evo_captcha_tmp/xxx.jpg)。
+        # 页面被请求的瞬间图片刚生成、必然有效，此时下载保存最可靠。
+        _capture_captcha_from_page(body, content_type, base_url)
+        body = _rewrite_fullme_html(body, content_type, base_url)
+    else:
+        # 图片类响应：若是验证码图片就顺带保存一份到本地（兜底路径）。
+        captcha_saver.save_bytes(final_url or url, body)
 
     return Response(
         body,
@@ -195,6 +229,8 @@ def _init_runtime_log():
     os.makedirs(os.path.dirname(_runtime_log_path), exist_ok=True)
     _runtime_log_file = open(_runtime_log_path, 'w', encoding='utf-8')
     _rt_log('=== 运行时日志启动 ===')
+    # 让验证码保存模块也写入运行时日志。
+    captcha_saver.set_logger(_rt_log)
 
 
 def _close_runtime_log():

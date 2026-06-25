@@ -10,6 +10,7 @@ import config
 from character_state import default_character_state_store, section_for_command
 from chat_monitor import is_chat_message
 from mud_telnet import gbk_safe_split, strip_iac_and_respond
+import captcha_saver
 from quick_commands import (
     delete_config as delete_quick_command_config,
     list_configs as list_quick_command_configs,
@@ -25,6 +26,24 @@ from bot_system import (
 from triggers import TriggerRuntime, delete_config, list_configs, load_config, save_config
 
 _ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07')
+
+# 提交验证码的命令：report/fullme + 验证码内容（中文或任意词）。
+_CAPTCHA_CMD_RE = re.compile(r'^\s*(report|fullme)\b\s*(.*)$', re.IGNORECASE)
+
+
+def _extract_captcha_code(command):
+    """从用户命令中提取验证码内容。
+
+    形如 `report 山药`、`fullme 黄药师` → 返回验证码内容（'山药'/'黄药师'）。
+    裸 `report`/`fullme`（仅触发验证码面板，无内容）→ 返回 None。
+    其它命令 → 返回 None。
+    """
+    m = _CAPTCHA_CMD_RE.match(str(command or ''))
+    if not m:
+        return None
+    code = m.group(2).strip()
+    return code or None
+
 
 # 频道中文关键字 → 频道 ID 映射（用于本地屏蔽）
 _CHANNEL_MAP = {
@@ -69,6 +88,7 @@ class MudSession:
         self._minimap_active = False  # 是否正在收集小地图行
         self._minimap_lines = []      # 自动捕获的小地图行
         self._quit_pending = False    # 等待 save 回复后发 quit
+        self._captcha_tasks = set()   # 正在后台下载的验证码图片任务
         self.muted_channels = set()   # 本地屏蔽的频道（终端不显示，右侧仍显示）
         self.triggers = TriggerRuntime()
         self.scripts = BotRuntime(
@@ -299,6 +319,45 @@ class MudSession:
             asyncio.create_task(_send())
         except RuntimeError:
             pass
+
+    def _maybe_capture_captcha(self, text):
+        """检测行内是否出现 fullme 验证码图片，若有则异步下载保存到本地。
+
+        MUD 下发形如 <img src="http://fullme.pkuxkx.net/zmud/<filename>.jpg">，
+        这是验证码出现的可靠信号。下载放到后台线程执行，不阻塞消息流；
+        captcha_saver 自带进程级去重，同一张图不会重复下载/保存。
+        下载失败会记入运行日志，不会静默吞掉异常。
+        """
+        if not text:
+            return
+        try:
+            urls = captcha_saver.find_captcha_urls(text)
+        except Exception:
+            return
+        for url in urls:
+            self._schedule_captcha_download(url)
+
+    def _schedule_captcha_download(self, url):
+        """后台下载一张验证码图片并保存，异常与结果都记入运行日志。"""
+        async def _runner():
+            try:
+                ok = await asyncio.to_thread(captcha_saver.download_and_save, url)
+                if ok:
+                    self.runtime_log(f'[CAPTCHA] 已保存验证码图片: {url}')
+                # ok=False 表示进程内已保存过（去重），无需额外日志
+            except Exception as e:
+                self.runtime_log(f'[CAPTCHA] 验证码图片下载失败 {url}: {e}')
+
+        try:
+            task = asyncio.create_task(_runner())
+            self._captcha_tasks.add(task)
+            task.add_done_callback(self._captcha_tasks.discard)
+        except RuntimeError:
+            # 无事件循环时降级为同步下载（极少见）。
+            try:
+                captcha_saver.download_and_save(url)
+            except Exception as e:
+                self.runtime_log(f'[CAPTCHA] 验证码图片下载失败 {url}: {e}')
 
     @staticmethod
     def _split_trigger_commands(command):
@@ -774,6 +833,8 @@ class MudSession:
                 self._log_data(line_text, 'recv')
                 await self._append_character_capture(line_text)
                 await self._handle_trigger_text(line_text)
+                # 验证码图片捕获：出现 fullme 验证码时异步下载保存到本地。
+                self._maybe_capture_captcha(line_text)
 
                 # save 回复检测：收到提示符说明 save 完成，发送 quit
                 if self._quit_pending and stripped.startswith('>'):
@@ -902,6 +963,22 @@ class MudSession:
                     j = json.loads(text_data)
                     if j.get('type') == 'command':
                         self._add_history(j['data'])
+                        # 用户提交验证码（report/fullme + 内容）时，
+                        # 用验证码内容作文件名把缓存的验证码图片落盘，
+                        # 保证图片与答案一一对应。
+                        cmd = str(j.get('data', '') or '').strip()
+                        code = _extract_captcha_code(cmd)
+                        if code is not None:
+                            saved = captcha_saver.commit_cached(code)
+                            if saved:
+                                self.runtime_log(f'[CAPTCHA] 验证码已记录: {code} -> {saved}')
+                    elif j.get('type') == 'captcha_image':
+                        # 前端回传小窗里已成功加载的验证码图片(base64)，落盘存档。
+                        # 这是验证码图片最可靠的来源（后端裸下载会因图片过期 404）。
+                        try:
+                            captcha_saver.save_base64(j.get('url', ''), j.get('data', ''))
+                        except Exception as e:
+                            self.runtime_log(f'[CAPTCHA] 小窗图片保存失败: {e}')
                     elif j.get('type') == 'mxp_reply':
                         reply = j.get('data', '')
                         if reply:

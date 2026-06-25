@@ -292,6 +292,39 @@
         fullmeFrame.src = proxyFullmeUrl(fullmeCurrentUrl);
     });
 
+    // 验证码小窗图片成功加载后，把图片数据回传后端存档。
+    // fullme 验证码图片有时效性（约 3 分钟即被服务器删除，后端裸下载会 404），
+    // 只有这张浏览器里已成功渲染的图才是可靠的来源。
+    fullmeImage.addEventListener('load', function() {
+        try {
+            // 图片经 /fullme-proxy 同源代理，canvas 不会被跨域污染，可正常导出。
+            const canvas = document.createElement('canvas');
+            const w = fullmeImage.naturalWidth || fullmeImage.width || 0;
+            const h = fullmeImage.naturalHeight || fullmeImage.height || 0;
+            if (!w || !h) return;
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(fullmeImage, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92); // data:image/jpeg;base64,xxxx
+            const b64 = dataUrl.split(',')[1];
+            if (!b64) return;
+            sendCaptchaImage(fullmeCurrentImageUrl || fullmeCurrentUrl, b64);
+        } catch (e) {
+            // 跨域污染或其它异常时静默放弃，不影响正常使用。
+        }
+    });
+
+    function sendCaptchaImage(url, base64) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (!base64) return;
+        ws.send(JSON.stringify({
+            type: 'captcha_image',
+            url: String(url || ''),
+            data: base64,
+        }));
+    }
+
     function inspectFullmeText(text) {
         updateFullmeModeFromText(text);
 

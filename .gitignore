@@ -5,3 +5,4 @@ _search_result.txt
 __pycache__/
 *.py[cod]
 *$py.class
+captcha_images/
