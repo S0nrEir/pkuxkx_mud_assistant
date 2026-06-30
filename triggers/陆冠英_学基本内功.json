@@ -1,12 +1,7 @@
 {
   "name": "陆冠英_学基本内功",
-  "notes": "起点需在陆冠英所在归云亭；累了自动 e;e;n;e 到休息室 sleep，睡好后 w;s;w;w 返回继续向陆冠英学习基本内功。",
+  "notes": "起点需在陆冠英所在归云亭；学习回显里若同时出现“太累”和“心得”，优先去 e;e;n;e 到休息室 sleep，睡好后 w;s;w;w 返回继续向陆冠英学习基本内功，避免休息/返回流程中重复学习导致走偏撞墙。",
   "rules": [
-    {
-      "keyword": "你听了陆冠英的指导，似乎有些心得。",
-      "command": "xue lu for force 10",
-      "delay": 0
-    },
     {
       "keyword": "你今天太累了，结果什么也没有学到。",
       "command": "e;e;n;e;sleep",
@@ -25,6 +20,11 @@
     {
       "keyword": "你一觉醒来，精神抖擞地活动了几下手脚",
       "command": "w;s;w;w;xue lu for force 10",
+      "delay": 0
+    },
+    {
+      "keyword": "你听了陆冠英的指导，似乎有些心得。",
+      "command": "xue lu for force 10",
       "delay": 0
     }
   ]

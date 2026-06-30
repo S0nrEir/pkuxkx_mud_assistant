@@ -103,6 +103,7 @@ class MudSession:
         self._trigger_waiting_response = False
         self._trigger_response_parts = []
         self._trigger_waiting_chunk = 0
+        self._trigger_rule_pending = False
         self._trigger_generation = 0
         self._mud_chunk_seq = 0
         self._raw_log_file = None   # 原始字节日志文件句柄
@@ -377,6 +378,7 @@ class MudSession:
         self._trigger_waiting_response = False
         self._trigger_response_parts = []
         self._trigger_waiting_chunk = 0
+        self._trigger_rule_pending = False
 
     def _trigger_is_current(self, active_id, generation):
         return (
@@ -423,23 +425,28 @@ class MudSession:
             await self._match_trigger_text(response_text)
 
     async def _run_trigger_rule(self, rule, active_id, generation):
-        commands = self._split_trigger_commands(rule.get('command'))
-        if not commands or not self._trigger_is_current(active_id, generation):
-            return
         try:
-            delay = float(rule.get('delay') or 0)
-        except (TypeError, ValueError):
-            delay = 0
-        delay = max(0, min(delay, 3600))
-        async with self._trigger_lock:
-            if not self._trigger_is_current(active_id, generation):
+            commands = self._split_trigger_commands(rule.get('command'))
+            if not commands or not self._trigger_is_current(active_id, generation):
                 return
-            if delay:
-                await asyncio.sleep(delay)
+            try:
+                delay = float(rule.get('delay') or 0)
+            except (TypeError, ValueError):
+                delay = 0
+            delay = max(0, min(delay, 3600))
+            async with self._trigger_lock:
                 if not self._trigger_is_current(active_id, generation):
                     return
-            self._queue_trigger_commands(commands, active_id, generation)
-            await self._advance_trigger_queue()
+                if delay:
+                    await asyncio.sleep(delay)
+                    if not self._trigger_is_current(active_id, generation):
+                        return
+                self._queue_trigger_commands(commands, active_id, generation)
+                self._trigger_rule_pending = False
+                await self._advance_trigger_queue()
+        finally:
+            if not self._trigger_queue and not self._trigger_waiting_response:
+                self._trigger_rule_pending = False
 
     async def _send_trigger_list(self, status=''):
         payload = {
@@ -704,13 +711,14 @@ class MudSession:
         await self._match_trigger_text(text)
 
     async def _match_trigger_text(self, text):
-        if self._trigger_queue or self._trigger_waiting_response:
+        if self._trigger_queue or self._trigger_waiting_response or self._trigger_rule_pending:
             return
         active_id = self.triggers.active_id
         generation = self._trigger_generation
         matches = self.triggers.match(text)
         if not matches:
             return
+        self._trigger_rule_pending = True
         task = asyncio.create_task(self._run_trigger_rule(matches[0], active_id, generation))
         self._trigger_tasks.add(task)
         task.add_done_callback(self._trigger_tasks.discard)
